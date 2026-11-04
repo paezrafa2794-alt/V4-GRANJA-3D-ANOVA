@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Harvest Valley 3D — Granja POV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* Estilo pixel/bloques: bordes negros duros, biseles de 3px, sin esquinas redondeadas */
+:root{--panel:rgba(22,22,26,.84);--gold:#ffdf5a;--cream:#f4f0df;--stone:#7d7d7d;--stoneHi:#b8b8b8;--stoneLo:#3c3c3c;--slot:#2b2b2b;
+ --px:"VT323",ui-monospace,Consolas,monospace;--px2:"Press Start 2P",var(--px);--sh:2px 2px 0 #000}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#9bc9d5;color:var(--cream);font-family:var(--px);font-size:18px;-webkit-font-smoothing:none}
+#game{position:fixed;inset:0}canvas{display:block;touch-action:none}
+.panel{background:var(--panel);border:3px solid #000;box-shadow:inset 3px 3px 0 rgba(255,255,255,.13),inset -3px -3px 0 rgba(0,0,0,.5)}
+#top{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:8px;justify-content:space-between;align-items:flex-start;pointer-events:none}
+#stats{padding:5px 11px;display:flex;gap:4px 14px;flex-wrap:wrap;font-size:20px;pointer-events:auto;text-shadow:var(--sh)}
+#stats b{color:var(--gold);font-weight:400}
+#help{padding:6px 10px;font-size:17px;max-width:330px;line-height:1.1;pointer-events:auto;text-shadow:var(--sh)}
+#topL{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+#eventbar{display:none;padding:4px 10px;font-size:18px;max-width:min(660px,calc(100vw - 20px));pointer-events:none;text-shadow:var(--sh)}
+@media(max-width:1050px){#help{display:none}}
+#cross{position:fixed;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);pointer-events:none;mix-blend-mode:difference}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff}
+#cross:before{width:2px;height:18px;left:8px}#cross:after{height:2px;width:18px;top:8px}
+#bottom{position:fixed;left:10px;right:10px;bottom:8px;display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:10px;pointer-events:none}
+#hud{display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;grid-column:2}
+#message{background:none;border:0;box-shadow:none;font-size:21px;text-shadow:var(--sh);text-align:center;max-width:560px;min-height:22px;padding:0 6px;pointer-events:none}
+#xpwrap{position:relative;width:100%;height:12px;margin-top:16px;background:#151515;border:2px solid #000}
+#xpfill{height:100%;width:0;background:linear-gradient(#c8ff78,#78c832 55%,#4d8a1c);transition:width .3s steps(10)}
+#xplvl{position:absolute;left:50%;top:-19px;transform:translateX(-50%);font-family:var(--px2);font-size:12px;color:#b9f26b;text-shadow:2px 2px 0 #000,-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000}
+#tools{display:flex;pointer-events:auto;background:rgba(0,0,0,.6);border:3px solid #000;padding:3px}
+#actions{grid-column:3;justify-self:end;display:grid;grid-template-columns:1fr 1fr;gap:6px;pointer-events:auto}
+button,select{font-family:var(--px);font-size:20px;color:#fff;text-shadow:2px 2px 0 #3a3a3a;background:var(--stone);border:3px solid #000;border-radius:0;
+ box-shadow:inset 3px 3px 0 var(--stoneHi),inset -3px -3px 0 var(--stoneLo);padding:6px 12px;cursor:pointer}
+button:hover,select:hover{background:#86955f;box-shadow:inset 3px 3px 0 #c3d18f,inset -3px -3px 0 #4a5630}
+button:active{box-shadow:inset 3px 3px 0 var(--stoneLo),inset -3px -3px 0 var(--stoneHi)}
+button:disabled{opacity:.4}
+.slot{position:relative;width:68px;height:68px;margin:0 1px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ background:var(--slot);border:2px solid #555;box-shadow:inset 3px 3px 0 #161616,inset -3px -3px 0 #4a4a4a;text-shadow:var(--sh)}
+.slot i{font-style:normal;font-size:28px;line-height:1;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.6))}
+.slot span{font-size:15px;margin-top:3px}
+.slot kbd{position:absolute;left:4px;top:3px;font-family:var(--px2);font-size:8px;color:#aaa}
+.slot:hover{background:#3a3a3a;box-shadow:inset 3px 3px 0 #161616,inset -3px -3px 0 #5c5c5c}
+.slot em{position:absolute;right:3px;top:1px;font-style:normal;font-size:13px;color:var(--gold);text-shadow:var(--sh)}
+.slot.active{border:3px solid #fff;outline:3px solid #000;z-index:1;background:#424242}
+#seedSel{height:68px;margin:0 1px;max-width:180px;background:var(--slot);border:2px solid #555;box-shadow:inset 3px 3px 0 #161616,inset -3px -3px 0 #4a4a4a;font-size:19px;text-shadow:var(--sh)}
+select option{background:#2b2b2b;color:#fff}
+#modal{position:fixed;display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:min(500px,calc(100vw - 24px));max-height:86vh;overflow:auto;padding:16px;z-index:5;background:rgba(32,32,36,.97)}
+#modal h2{margin:0 0 10px;font-family:var(--px2);font-size:14px;line-height:1.5;color:var(--gold);padding-right:44px;text-shadow:var(--sh)}
+#modal p{font-size:19px;line-height:1.15;margin:7px 0}
+#modal table{font-size:17px!important}
+#modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+#modal button{width:100%;font-size:18px}
+#modal .wide{grid-column:1/-1}
+#close{position:absolute;right:10px;top:10px;width:auto!important;padding:2px 9px}
+#mobile{position:fixed;left:12px;bottom:118px;display:none;gap:4px;pointer-events:auto}
+#look{position:fixed;right:10px;bottom:118px;display:none;gap:4px;pointer-events:auto}
+#mobile button,#look button{width:48px;height:48px;padding:0;font-size:20px}
+#toast{position:fixed;top:100px;left:50%;transform:translateX(-50%);padding:6px 14px;display:none;max-width:90vw;text-align:center;font-size:20px;z-index:9;text-shadow:var(--sh)}
+@media(max-width:700px){
+  #help,#message{display:none}
+  #top{top:6px;left:6px;right:6px}
+  #stats{width:100%;justify-content:center;font-size:16px;gap:9px;padding:4px 7px}
+  #topL{width:100%}#eventbar{font-size:15px}
+  #bottom{left:4px;right:4px;bottom:4px;grid-template-columns:1fr}
+  #hud{grid-column:1;width:100%}
+  #tools{max-width:100%;overflow-x:auto;scrollbar-width:none}
+  #tools::-webkit-scrollbar{display:none}
+  .slot{flex:0 0 auto;width:58px;height:58px}.slot i{font-size:23px}.slot span{font-size:13px}
+  #seedSel{flex:0 0 auto;height:58px}
+  #actions{position:fixed;right:6px;top:96px;grid-template-columns:1fr;gap:5px}
+  #actions button{font-size:16px;padding:4px 8px}
+  #mobile{display:grid;grid-template-columns:repeat(4,46px);left:8px;bottom:104px}
+  #mobile button,#look button{width:46px;height:46px}
+  #look{display:flex;right:8px;bottom:104px}
+  #toast{top:92px;font-size:17px}
+}
+</style>
+</head>
+<body>
+<div id="game"></div><div id="cross"></div>
+<div id="top">
+ <div id="topL"><div id="stats" class="panel"><span>📅 <b id="day">Día 1 · Primavera</b></span><span><b id="clock">07:00</b></span><span>🌡️ <b id="temp">21°C</b></span><span>☁️ <b id="weather">Soleado</b></span><span>🪙 <b id="money">150</b></span><span>🚿 <b id="agua">100</b></span><span>⭐ <b id="xp">Nivel 1 · 0 XP</b></span></div><div id="eventbar" class="panel"></div></div>
+ <div id="help" class="panel">WASD: caminar · Shift: correr · Ratón: mirar (clic para capturar, Esc para soltar; si no, arrastra) · Flechas: girar · Espacio: saltar · E: usar herramienta / rellenar en el estanque / hablar con el cajero del OXXO · Clic: abrir parcela · 1-5: herramientas · T: dormir</div>
+</div>
+<div id="bottom">
+ <div id="hud">
+  <div id="message" class="panel">Bienvenido. Acércate a una parcela y apúntala con la mira.</div>
+  <div id="xpwrap" title="Experiencia"><div id="xpfill"></div><span id="xplvl">1</span></div>
+  <div id="tools">
+   <button class="slot active" data-tool="hoe"><kbd>1</kbd><i>⛏️</i><span>Azada</span></button><button class="slot" data-tool="seed"><kbd>2</kbd><i>🌱</i><span>Sembrar</span></button><select id="seedSel" title="Semilla"></select><button class="slot" data-tool="water"><kbd>3</kbd><i>💧</i><span>Regar</span></button><button class="slot" data-tool="fert"><kbd>4</kbd><i>🧪</i><span>Abonar</span></button><button class="slot" data-tool="harvest"><kbd>5</kbd><i>🧺</i><span>Cosechar</span></button>
+  </div>
+ </div>
+ <div id="actions"><button id="sleep">🌙 Dormir</button><button id="inventory">🎒 Inventario</button><button id="shop">🏪 Tienda</button><button id="data">📊 Datos</button></div>
+</div>
+<div id="mobile"><button data-move="forward">▲</button><button data-move="left">◀</button><button data-move="back">▼</button><button data-move="right">▶</button></div>
+<div id="look"><button id="turnL">↶</button><button id="turnR">↷</button><button id="jumpB" title="Saltar">⤒</button><button id="use">E</button></div>
+<div id="modal" class="panel"><button id="close">✕</button><h2 id="mtitle">Parcela</h2><div id="mbody"></div><div class="grid" id="mbuttons"></div></div>
+<div id="toast" class="panel"></div>
+<input type="file" id="sunFile" accept="image/*" hidden>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+window.THREE=THREE;
+(()=>{
+const $=id=>document.getElementById(id),root=$('game');
+if(!window.THREE){root.innerHTML='<div style="padding:30px;color:#182">No se pudo cargar Three.js. Abre este archivo con conexión a internet.</div>';return;}
+const T=THREE,clamp=T.MathUtils.clamp,pick=a=>a[Math.floor(Math.random()*a.length)];
+const SEASONS=['Primavera','Verano','Otoño','Invierno'];
+// ---------- DATOS DE CULTIVOS ----------
+// days: días para cosechar · sp: estaciones adecuadas · ph: rango ideal · kg: rendimiento base por parcela · frost: tolera frío
+const CROPS={
+ Tomate:{i:'🍅',days:9,price:12,seed:3,sp:[0,1],ph:[6,6.8],kg:3.2,shape:'bush',fruit:0xc94332,frost:false},
+ Chile:{i:'🌶️',days:10,price:15,seed:4,sp:[1,2],ph:[6,7],kg:1.6,shape:'bush',fruit:0xd23a1f,frost:false,pepper:1},
+ Fresa:{i:'🍓',days:8,price:14,seed:4,sp:[0,1],ph:[5.5,6.5],kg:1.1,shape:'bush',fruit:0xe0344a,frost:false,low:1},
+ Zanahoria:{i:'🥕',days:8,price:10,seed:2,sp:[0,2,3],ph:[6,7],kg:2.4,shape:'root',fruit:0xe88b32,frost:true},
+ Papa:{i:'🥔',days:10,price:11,seed:2,sp:[0,2,3],ph:[5,6.5],kg:3.5,shape:'root',fruit:0xb08a55,frost:true},
+ Lechuga:{i:'🥬',days:6,price:8,seed:2,sp:[0,2,3],ph:[6,7],kg:1.3,shape:'leafy',fruit:0x8fcf5a,frost:true},
+ Maíz:{i:'🌽',days:12,price:16,seed:3,sp:[1,2],ph:[5.8,7],kg:4.5,shape:'tall',fruit:0xf0d24a,frost:false},
+ Girasol:{i:'🌻',days:11,price:13,seed:3,sp:[1],ph:[6,7.5],kg:2.0,shape:'sun',fruit:0xf5c518,frost:false},
+ Calabaza:{i:'🎃',days:14,price:20,seed:5,sp:[2],ph:[6,7],kg:6.0,shape:'vine',fruit:0xe3781f,frost:false},
+ Sandía:{i:'🍉',days:14,price:22,seed:5,sp:[1],ph:[6,7],kg:7.0,shape:'vine',fruit:0x3f8f45,frost:false}
+};
+const CNAMES=Object.keys(CROPS);
+// Tratamientos del cuadro latino (fertilización)
+const TREAT=[
+ {k:'A',n:'Control (sin fertilizante)',eff:1,compost:0,npk:0},
+ {k:'B',n:'Compost',eff:1.10,compost:1,npk:0},
+ {k:'C',n:'NPK mineral',eff:1.18,compost:0,npk:1},
+ {k:'D',n:'Compost + NPK',eff:1.27,compost:1,npk:1}
+];
+const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+function perm(n){const a=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function newSquare(){const r=perm(4),c=perm(4),s=perm(4);return r.map(ri=>c.map(cj=>s[(ri+cj)%4]))}
+function mkEff(a){const sg=Math.random()<.5?1:-1;return [0,1,2,3].map(i=>+(1+sg*a*(1.5-i)/1.5+(Math.random()-.5)*.02).toFixed(3))}
+const G={day:1,abs:1,season:0,temp:21,weather:'Soleado',money:150,xp:0,level:1,t:420,
+ inv:{seeds:{Tomate:16,Zanahoria:4,Fresa:4,Lechuga:6,Maíz:4,Papa:4,Chile:2,Girasol:2,Calabaza:1,Sandía:1},compost:8,npk:6,agua:100,cosechas:0},
+ sq:newSquare(),sqn:1,rowEff:mkEff(.07),colEff:mkEff(.05),records:[],market:{m:1,d:0},ev:null,evText:'',eventsOn:true,seedSel:'Tomate',
+ dec:(1.5).toLocaleString().includes(',')?',':'.',sky:1,skyEv:null,up:{}};
+// ---------- ESCENA ----------
+const scene=new T.Scene();scene.fog=new T.Fog(0x9bc9d5,28,90);const sky=new T.Color(0x9bc9d5);scene.background=sky;
+const camera=new T.PerspectiveCamera(72,innerWidth/innerHeight,.1,220);camera.position.set(0,1.62,9.2);camera.rotation.order='YXZ';
+const renderer=new T.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;root.appendChild(renderer.domElement);
+const hemi=new T.HemisphereLight(0xdff5ff,0x59603a,2);scene.add(hemi);
+const sun=new T.DirectionalLight(0xfff1d0,2.3);sun.castShadow=true;sun.shadow.mapSize.set(innerWidth>700?2048:1024,innerWidth>700?2048:1024);
+{const c=sun.shadow.camera;c.left=c.bottom=-18;c.right=c.top=18;c.near=1;c.far=70;sun.shadow.bias=-.0004;}
+scene.add(sun,sun.target);
+const moonL=new T.DirectionalLight(0x7f95d8,0);scene.add(moonL);
+const mat=(c,r=.9)=>new T.MeshStandardMaterial({color:c,roughness:r});
+// Fusiona todas las mallas de un grupo en una por material (menos draw calls)
+function bake(src){src.updateMatrixWorld(true);const by=new Map();
+ src.traverse(o=>{if(!o.isMesh)return;let e=by.get(o.material);if(!e)by.set(o.material,e={gs:[],cast:o.castShadow,recv:o.receiveShadow});e.gs.push(o.geometry.clone().applyMatrix4(o.matrixWorld));o.geometry.dispose()});
+ const out=new T.Group();by.forEach((e,m)=>{const g=mergeGeometries(e.gs);e.gs.forEach(x=>x.dispose());const o=new T.Mesh(g,m);o.castShadow=e.cast;o.receiveShadow=e.recv;out.add(o)});return out}
+const stat=new T.Group();// escenografía estática, se fusiona al final
+function ptex(base,speck,count,size=256){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,size,size);
+ for(let i=0;i<count;i++){x.globalAlpha=.12+Math.random()*.28;x.fillStyle=speck;x.beginPath();x.arc(Math.random()*size,Math.random()*size,1+Math.random()*4,0,Math.PI*2);x.fill()}
+ x.globalAlpha=1;const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.colorSpace=T.SRGBColorSpace;t.anisotropy=4;return t}
+const grass=mat(0x6d9c54);grass.map=ptex('#709a55','#355c32',220);grass.map.repeat.set(70,70);
+const soilTex=ptex('#76543c','#34251c',260);soilTex.repeat.set(2,2);
+const wood=mat(0x76502e),leaf=mat(0x39834b),leaf2=mat(0x70a84b);
+function box(w,h,d,m,x,y,z){const o=new T.Mesh(new T.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;stat.add(o);return o}
+box(300,.3,300,grass,0,-.2,0).castShadow=false;
+// Cielo: sol, luna, estrellas, nubes
+const sunMesh=new T.Mesh(new T.SphereGeometry(4,16,12),new T.MeshBasicMaterial({color:0xfff2b0,fog:false}));
+const moonMesh=new T.Mesh(new T.SphereGeometry(3,16,12),new T.MeshBasicMaterial({color:0xe8ecff,fog:false}));scene.add(sunMesh,moonMesh);
+const sp=new Float32Array(900);for(let i=0;i<300;i++){const a=Math.random()*Math.PI*2,e=Math.random()*1.4+.05,r=160;sp.set([Math.cos(a)*Math.cos(e)*r,Math.sin(e)*r,Math.sin(a)*Math.cos(e)*r],i*3)}
+const sg=new T.BufferGeometry();sg.setAttribute('position',new T.BufferAttribute(sp,3));
+const stars=new T.Points(sg,new T.PointsMaterial({color:0xffffff,size:1.8,sizeAttenuation:false,transparent:true,opacity:0,fog:false}));stars.frustumCulled=false;scene.add(stars);
+const cloudMat=new T.MeshStandardMaterial({color:0xffffff,roughness:1,transparent:true,opacity:.93});const clouds=[];
+for(let i=0;i<11;i++){const g=new T.Group();for(let j=0;j<4;j++){const s=new T.Mesh(new T.SphereGeometry(3+Math.random()*2,10,8),cloudMat);s.scale.y=.45;s.position.set(j*3.5-5,Math.random()*.8,Math.random()*2.5);g.add(s)}g.position.set((Math.random()-.5)*170,30+Math.random()*10,(Math.random()-.5)*170);scene.add(g);clouds.push(g)}
+// Colinas lejanas y árboles
+const hillM=[mat(0x5d8a4a),mat(0x4f7a42)],pineM=mat(0x2f6b45);
+for(let i=0;i<16;i++){const a=i/16*Math.PI*2+Math.random()*.3,r=70+Math.random()*25,h=7+Math.random()*9;const m=new T.Mesh(new T.ConeGeometry(11+Math.random()*8,h,8),hillM[i%2]);m.position.set(Math.cos(a)*r,h/2-.3,Math.sin(a)*r);stat.add(m)}
+function tree(x,z,pine){const k=.8+Math.random()*.5;const tr=new T.Mesh(new T.CylinderGeometry(.22*k,.3*k,1.8*k,7),wood);tr.position.set(x,.8*k,z);tr.castShadow=true;stat.add(tr);
+ if(pine){for(let j=0;j<3;j++){const c=new T.Mesh(new T.ConeGeometry((1.3-j*.3)*k,1.5*k,8),pineM);c.position.set(x,(1.7+j*.9)*k,z);c.castShadow=true;stat.add(c)}}
+ else{const c=new T.Mesh(new T.SphereGeometry(1.25*k,9,8),Math.random()<.5?leaf:leaf2);c.position.set(x,2.1*k,z);c.castShadow=true;stat.add(c)}}
+const treeSpots=[[-8.2,7.5],[-8,-8.6],[8.2,-8.6]];treeSpots.forEach(t=>tree(t[0],t[1],false));
+for(let i=0;i<30;i++){const a=Math.random()*Math.PI*2,r=15+Math.random()*28;tree(Math.cos(a)*r,Math.sin(a)*r,Math.random()<.5)}
+// Pasto y flores (instanciados)
+{const n=900,im=new T.InstancedMesh(new T.ConeGeometry(.05,.38,4),mat(0x5f9a45),n),d=new T.Object3D();let k=0;
+ while(k<n){const x=(Math.random()-.5)*90,z=(Math.random()-.5)*90;if(Math.abs(x)<10.5&&Math.abs(z)<10.5&&(Math.abs(x)>1.8&&z<5.5||Math.random()<.9)||((x+4.6)/2.5)**2+((z-7.4)/1.75)**2<1||(x>4.5&&x<9.8&&z>5.1&&z<9.8))continue;/* fuera de parcelas, estanque y tienda */d.position.set(x,.1,z);d.scale.setScalar(.7+Math.random()*1.1);d.rotation.y=Math.random()*3;d.updateMatrix();im.setMatrixAt(k,d.matrix);im.setColorAt(k,new T.Color().setHSL(.25+Math.random()*.07,.45,.28+Math.random()*.14));k++}
+ scene.add(im);
+ const fn=70,fl=new T.InstancedMesh(new T.SphereGeometry(.09,6,5),mat(0xffffff,.6),fn);const cols=[0xf5d142,0xf27ba8,0xffffff,0xb27be8,0xf29a41];
+ for(let i=0;i<fn;i++){let x,z;do{x=(Math.random()-.5)*40;z=(Math.random()-.5)*40}while(Math.abs(x)<10.5&&Math.abs(z)<10.5);d.position.set(x,.2,z);d.scale.setScalar(1);d.updateMatrix();fl.setMatrixAt(i,d.matrix);fl.setColorAt(i,new T.Color(pick(cols)))}scene.add(fl)}
+// Cerca
+const fm=mat(0x8a5f36);
+for(let x=-10;x<=10;x+=2){box(.14,1.05,.14,fm,x,.45,-10);if(Math.abs(x)>1.6)box(.14,1.05,.14,fm,x,.45,10)}
+for(let z=-10;z<=10;z+=2){box(.14,1.05,.14,fm,-10,.45,z);box(.14,1.05,.14,fm,10,.45,z)}
+[.35,.75].forEach(y=>{box(20,.07,.07,fm,0,y,-10);box(8.4,.07,.07,fm,-5.8,y,10);box(8.4,.07,.07,fm,5.8,y,10);box(.07,.07,20,fm,-10,y,0);box(.07,.07,20,fm,10,y,0)});
+// Camino
+{const pm=mat(0xc2aa7a);pm.map=ptex('#c2aa7a','#8d7650',300);pm.map.repeat.set(1,8);box(3,.04,22,pm,0,-.01,0).castShadow=false}
+// Cobertizo
+// ---------- TIENDA OXXO (sustituye al cobertizo) ----------
+// Planta: x 4.8–9.4, z 5.4–9.4; puerta corrediza en la fachada oeste (mira al camino); mostrador al norte
+const STORE={x1:4.8,x2:9.4,z1:5.4,z2:9.4,doorZ:7.4};
+function tex2d(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.anisotropy=4;return t}
+const signTex=tex2d(512,96,(x,w,h)=>{x.fillStyle='#e4002b';x.fillRect(0,0,w,h);x.fillStyle='#ffc72c';x.fillRect(0,6,w,10);x.fillRect(0,h-16,w,10);
+ x.fillStyle='#fff';x.font='900 58px "Arial Black", Arial, sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('OXXO',w/2,h/2+2)});
+const winMat=new T.MeshStandardMaterial({map:signTex,emissive:0xffffff,emissiveMap:signTex,emissiveIntensity:0,roughness:.6});// letrero, brilla de noche
+const tileTex=tex2d(128,128,(x,w)=>{for(let i=0;i<4;i++)for(let j=0;j<4;j++){x.fillStyle=(i+j)%2?'#e9e6df':'#d3d0c9';x.fillRect(i*32,j*32,32,32)}});tileTex.wrapS=tileTex.wrapT=T.RepeatWrapping;tileTex.repeat.set(4,3.5);
+const fridgeTex=tex2d(256,128,(x,w,h)=>{x.fillStyle='#dff1ff';x.fillRect(0,0,w,h);const cols=['#e4002b','#1d6fd8','#2fb54a','#ff8a1f','#7b3fc4','#f2d02c'];
+ for(let r=0;r<3;r++){x.fillStyle='#9fb6c6';x.fillRect(0,(r+1)*h/3-3,w,3);for(let i=0;i<14;i++){x.fillStyle=cols[(i+r*3)%cols.length];const bx=6+i*18,by=r*h/3+8;x.fillRect(bx,by+6,11,h/3-18);x.fillRect(bx+3,by,5,7)}}
+ x.fillStyle='#555';for(let i=1;i<3;i++)x.fillRect(i*w/3-2,0,4,h)});
+const white=mat(0xf3f0ea,.8),red=mat(0xe4002b,.6),yel=mat(0xffc72c,.6),gray=mat(0x8f949a,.5),dark=mat(0x2c2f33,.5);
+const glassM=new T.MeshStandardMaterial({color:0xa9dcef,roughness:.05,metalness:.1,transparent:true,opacity:.28});
+{const S=STORE,cx=(S.x1+S.x2)/2,cz=(S.z1+S.z2)/2,W=S.x2-S.x1,D=S.z2-S.z1;
+ box(W,.05,D,new T.MeshStandardMaterial({map:tileTex,roughness:.5}),cx,.025,cz).castShadow=false;
+ box(W,3,.12,white,cx,1.5,S.z1);box(W,3,.12,white,cx,1.5,S.z2);box(.12,3,D,white,S.x2,1.5,cz);// sur, norte, este
+ box(W+.02,.35,.14,red,cx,.18,S.z1);box(.14,.35,D,red,S.x2,.18,cz);// zócalo rojo
+ [[S.z1,S.doorZ-.6],[S.doorZ+.6,S.z2]].forEach(([a,b])=>{const c=(a+b)/2,l=b-a;box(.12,.9,l,white,S.x1,.45,c);box(.05,1.4,l,glassM,S.x1,1.6,c).castShadow=false;box(.12,.7,l,white,S.x1,2.65,c);box(.14,.3,l,red,S.x1,.15,c)});
+ box(.12,.7,1.2,white,S.x1,2.65,S.doorZ);box(.16,2.3,.08,gray,S.x1,1.15,S.doorZ-.6);box(.16,2.3,.08,gray,S.x1,1.15,S.doorZ+.6);
+ box(W+.3,.2,D+.3,mat(0xd9d4cc),cx,3.1,cz);box(W+.32,.08,D+.32,yel,cx,3.0,cz);// techo con franja amarilla
+ const sw=new T.Mesh(new T.PlaneGeometry(D-.1,.72),winMat);sw.rotation.y=-Math.PI/2;sw.position.set(S.x1-.08,2.62,cz);stat.add(sw);// letrero oeste
+ const ss=new T.Mesh(new T.PlaneGeometry(W-.1,.72),winMat);ss.rotation.y=Math.PI;ss.position.set(cx,2.62,S.z1-.08);stat.add(ss);// letrero sur
+ const lm=new T.MeshBasicMaterial({color:0xffffff});[6.6,8.2].forEach(z=>box(2.6,.04,.22,lm,cx,2.96,z).castShadow=false);
+ // Anaqueles con productos
+ const prod=[0xe4002b,0x1d6fd8,0x2fb54a,0xff8a1f,0xf2d02c,0x7b3fc4,0xffffff].map(c=>mat(c,.6));
+ const goods=(x1,n,y,z)=>{for(let i=0;i<n;i++){const h=.16+Math.random()*.12;box(.16,h,.13,prod[(Math.random()*prod.length)|0],x1+i*.24,y+.02+h/2,z)}};
+ box(2,1.5,.06,gray,7.4,.75,6.5);[.3,.75,1.2].forEach(y=>{box(2,.04,.42,gray,7.4,y,6.5);goods(6.52,8,y,6.37);goods(6.52,8,y,6.63)});
+ [.3,.75,1.2].forEach(y=>{box(3,.04,.34,gray,7.3,y,5.64);goods(5.92,12,y,5.66)});
+ // Refrigerador con puertas iluminadas
+ box(.32,2.1,2.4,dark,9.2,1.05,6.8);const fd=new T.Mesh(new T.PlaneGeometry(2.3,1.8),new T.MeshStandardMaterial({map:fridgeTex,emissive:0xffffff,emissiveMap:fridgeTex,emissiveIntensity:.35,roughness:.15}));fd.rotation.y=-Math.PI/2;fd.position.set(9.03,1.1,6.8);stat.add(fd);
+ // Mostrador y caja registradora
+ box(2.2,1,.5,red,7.1,.5,8.65);box(2.3,.05,.6,white,7.1,1.02,8.65);box(2.22,.12,.52,yel,7.1,.86,8.65);
+ box(.36,.24,.3,dark,7.75,1.16,8.68);box(.26,.14,.02,new T.MeshBasicMaterial({color:0x33ff88}),7.75,1.24,8.52).castShadow=false}
+const STORE_RECTS=[[4.74,4.86,5.4,6.8],[4.74,4.86,8.0,9.4],[4.8,9.4,5.34,5.46],[4.8,9.4,9.34,9.46],[9.34,9.46,5.4,9.4],
+ [6.0,8.2,8.4,8.9],[6.4,8.4,6.27,6.73],[5.8,8.8,5.4,5.85],[9.04,9.4,5.6,8.0]];
+const inStore=()=>{const c=camera.position;return c.x>STORE.x1&&c.x<STORE.x2&&c.z>STORE.z1&&c.z<STORE.z2};
+// Puertas corredizas de vidrio (se abren al acercarte)
+const doors=[-1,1].map(s=>{const d=new T.Mesh(new T.BoxGeometry(.04,2.2,.6),glassM);d.position.set(STORE.x1,1.12,STORE.doorZ+s*.3);scene.add(d);return d});
+function updateDoors(dt){const c=camera.position,near=Math.hypot(c.x-STORE.x1,c.z-STORE.doorZ)<2.4;doors.forEach((d,i)=>{const s=i?1:-1,tz=STORE.doorZ+s*(near?.88:.3);d.position.z+=(tz-d.position.z)*Math.min(1,dt*6)})}
+const lamp=new T.PointLight(0xffc477,0,12,2);lamp.position.set(4.2,2.7,STORE.doorZ);scene.add(lamp);
+const storeLight=new T.PointLight(0xffffff,7,7.5,1.6);storeLight.position.set(7.1,2.7,7.4);scene.add(storeLight);
+// ---------- CAJERO ALIEN ----------
+const alien=new T.Group(),aHead=new T.Group(),aAnt=[];
+{const g=new T.MeshStandardMaterial({color:0x39d353,roughness:.45}),eye=new T.MeshStandardMaterial({color:0x050505,roughness:.06,metalness:.4}),tip=new T.MeshStandardMaterial({color:0x7dff6a,emissive:0x2bff3c,emissiveIntensity:.7,roughness:.4}),mouth=mat(0x1f7a2c,.6);
+ const add=(o,par,x,y,z)=>{o.position.set(x,y,z);o.castShadow=true;par.add(o);return o};
+ add(new T.Mesh(new T.CapsuleGeometry(.22,.55,6,14),g),alien,0,.62,0);
+ [-1,1].forEach(s=>{const a=add(new T.Mesh(new T.CapsuleGeometry(.05,.38,4,8),g),alien,s*.28,.88,-.14);a.rotation.x=-1.05;a.rotation.z=s*.15;add(new T.Mesh(new T.SphereGeometry(.065,10,8),g),alien,s*.3,.98,-.36)});
+ add(new T.Mesh(new T.CylinderGeometry(.07,.09,.14,10),g),alien,0,1.08,0);
+ aHead.position.set(0,1.36,0);alien.add(aHead);const hd=add(new T.Mesh(new T.SphereGeometry(.3,24,18),g),aHead,0,0,0);hd.scale.set(1,1.15,.95);
+ [-1,1].forEach(s=>{const e=add(new T.Mesh(new T.SphereGeometry(.09,16,12),eye),aHead,s*.12,.04,-.25);e.scale.set(1.3,.72,.5);e.rotation.z=s*.38;e.rotation.y=-s*.3});
+ const m=add(new T.Mesh(new T.TorusGeometry(.065,.012,6,14,Math.PI),mouth),aHead,0,-.13,-.27);m.rotation.z=Math.PI;
+ [-1,1].forEach(s=>{const a=new T.Group();a.position.set(s*.1,.3,0);a.rotation.z=-s*.32;aHead.add(a);add(new T.Mesh(new T.CylinderGeometry(.013,.016,.34,6),g),a,0,.17,0);add(new T.Mesh(new T.SphereGeometry(.05,12,10),tip),a,0,.36,0);aAnt.push({a,s})});
+ alien.position.set(7.1,0,9.12);scene.add(alien)}
+let alienExcite=0,greeted=false;
+const nearAlien=()=>inStore()&&camera.position.z>6.85;// pasillo del mostrador (al norte del anaquel central)
+function updateAlien(dt,t){alienExcite=Math.max(0,alienExcite-dt);alien.position.y=Math.sin(t*2.1)*.02;
+ aAnt.forEach(({a,s})=>{a.rotation.z=-s*.32+Math.sin(t*(6+alienExcite*10)+s)*(.1+alienExcite*.25)});
+ let ty=0;if(inStore()){const dx=camera.position.x-alien.position.x,dz=camera.position.z-alien.position.z;ty=clamp(Math.atan2(-dx,-dz),-1,1)}aHead.rotation.y+=(ty-aHead.rotation.y)*Math.min(1,dt*4)}
+// ---------- PARCELAS (cuadro latino 4×4) ----------
+const plots=[],PX=[-6.6,-3.4,3.4,6.6],PZ=[-6,-2.9,.2,3.3];
+const soilGeo=new T.BoxGeometry(2.65,.16,2.25),borderM=mat(0x5b3d22);
+const ridgeGeo=mergeGeometries([-.8,-.27,.27,.8].map(o=>new T.BoxGeometry(2.35,.09,.34).translate(0,.13,o)));
+const cDry=new T.Color(0xffffff),cWet=new T.Color(0x6a625a);
+function labelMat(p){const c=document.createElement('canvas');c.width=256;c.height=96;const x=c.getContext('2d');x.fillStyle='rgba(40,28,16,.9)';x.fillRect(0,0,256,96);x.strokeStyle='#d9b36c';x.lineWidth=6;x.strokeRect(3,3,250,90);
+ x.fillStyle='#f2d27a';x.font='bold 64px system-ui';x.fillText(p.letter||'?',18,70);x.fillStyle='#f4f0df';x.font='bold 26px system-ui';x.fillText('P'+p.id,100,40);x.font='22px system-ui';x.fillText('F'+(p.row+1)+' · C'+(p.col+1),100,74);
+ const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;return new T.SpriteMaterial({map:t,depthWrite:false})}
+for(let r=0;r<4;r++)for(let c=0;c<4;c++){const x=PX[c],z=PZ[r],id=r*4+c+1;
+ const sm=new T.MeshStandardMaterial({color:0xffffff,roughness:.95,map:soilTex});
+ const mesh=new T.Mesh(soilGeo,sm);mesh.position.set(x,.04,z);mesh.receiveShadow=true;scene.add(mesh);
+ [[2.85,.1,0,1.2],[2.85,.1,0,-1.2]].forEach(b=>{box(b[0],.22,b[1],borderM,x,.1,z+b[3])});box(.1,.22,2.5,borderM,x-1.37,.1,z);box(.1,.22,2.5,borderM,x+1.37,.1,z);
+ const rg=new T.Mesh(ridgeGeo,sm);rg.castShadow=rg.receiveShadow=true;rg.position.set(x,0,z);rg.visible=false;scene.add(rg);
+ const p={id,row:r,col:c,x,z,mesh,mat:sm,ridges:rg,letter:'A',tilled:false,water:35,n:45,p:40,k:40,ph:6.5,organic:30,crop:null,stage:0,health:100,days:0,applied:false,wsum:0,bonus:0,qb:0,plant:null};
+ p.label=new T.Sprite(labelMat(p));p.label.scale.set(1.15,.43,1);p.label.position.set(x,.62,z+1.36);scene.add(p.label);makeMeter(p);plots.push(p)}
+// ---------- ESTANQUE (rellena la regadera) ----------
+const POND={x:-4.6,z:7.4,rx:2.1,rz:1.35};
+{const st=[mat(0x8d8f91),mat(0x6f7275)],n=18;
+ for(let i=0;i<n;i++){const a=i/n*Math.PI*2,s=.32+Math.random()*.16,o=box(s*1.4,.22+Math.random()*.12,s,st[i%2],POND.x+Math.cos(a)*(POND.rx+.15),.06,POND.z+Math.sin(a)*(POND.rz+.15));o.rotation.y=-a}
+ const lily=mat(0x4e9a3c,.7);[[-.7,.2],[.5,-.35],[.9,.4]].forEach(l=>{const o=new T.Mesh(new T.CylinderGeometry(.24,.24,.02,10),lily);o.position.set(POND.x+l[0],.035,POND.z+l[1]);stat.add(o)});
+ const flower=new T.Mesh(new T.SphereGeometry(.08,6,5),mat(0xf6a6c8,.6));flower.position.set(POND.x-.7,.08,POND.z+.2);stat.add(flower)}
+const waterTex=canvasTex(128,128,x=>{x.fillStyle='#3d86b4';x.fillRect(0,0,128,128);for(let i=0;i<90;i++){x.fillStyle=`rgba(255,255,255,${.05+Math.random()*.12})`;x.fillRect(Math.random()*128|0,Math.random()*128|0,6+Math.random()*10|0,2)}});
+waterTex.wrapS=waterTex.wrapT=T.RepeatWrapping;waterTex.repeat.set(3,2);
+const pond=new T.Mesh(new T.CircleGeometry(1,40),new T.MeshStandardMaterial({map:waterTex,roughness:.12,metalness:.15,transparent:true,opacity:.9}));
+pond.rotation.x=-Math.PI/2;pond.scale.set(POND.rx,POND.rz,1);pond.position.set(POND.x,.03,POND.z);pond.receiveShadow=true;scene.add(pond);
+const nearPond=()=>{const dx=(camera.position.x-POND.x)/(POND.rx+1.6),dz=(camera.position.z-POND.z)/(POND.rz+1.6);return dx*dx+dz*dz<1};
+function pondHit(max){camera.updateMatrixWorld();ray.setFromCamera(center,camera);const h=ray.intersectObject(pond);return h.length&&h[0].distance<=max}
+function refill(){const cap=waterCap();if(G.inv.agua>=cap){toast('💧 La regadera ya está llena');return}G.inv.agua=cap;toast(`💧 Regadera rellenada en el estanque (${cap})`);updateStats();save()}
+// ---------- MEJORAS DE HERRAMIENTAS (se compran con el alien del OXXO) ----------
+// t[nivel]: nivel 1 = herramienta inicial; cada efecto se aplica en useTool / plantCrop / quality / movimiento
+const UPG={
+ hoe:{i:'⛏️',t:[null,{n:'Azada'},{n:'Azada de acero',c:120,d:'al arar: +6% materia orgánica y +1 XP'},{n:'Azada de titanio',c:320,d:'al arar: +12% materia orgánica, +3 N/P/K y +2 XP'}]},
+ seed:{i:'🌱',t:[null,{n:'Sembrar'},{n:'Sembradora manual',c:150,d:'las semillas nacen con 1 día de ventaja'},{n:'Sembradora de precisión',c:380,d:'2 días de ventaja y +5 de calidad'}]},
+ water:{i:'💧',t:[null,{n:'Regadera'},{n:'Regadera de cobre',c:100,d:'capacidad 160, riega +45% y gasta 5'},{n:'Aspersor dorado',c:300,d:'capacidad 250, riega +50% y también las parcelas vecinas de la fila'}]},
+ fert:{i:'🧪',t:[null,{n:'Abonar'},{n:'Abonadora de mochila',c:140,d:'los nutrientes del tratamiento rinden ×1.25'},{n:'Abonadora de precisión',c:360,d:'los nutrientes rinden ×1.5'}]},
+ harvest:{i:'🧺',t:[null,{n:'Cosechar'},{n:'Hoz de acero',c:160,d:'+15% monedas por venta y +5 de calidad'},{n:'Cosechadora mini',c:420,d:'+35% monedas y +10 de calidad'}]},
+ boots:{i:'👟',t:[null,{n:'Botas de hule'},{n:'Tenis deportivos',c:90,d:'+25% velocidad y salto más alto'},{n:'Tenis cohete',c:260,d:'+50% velocidad y súper salto'}]}};
+const lv=k=>G.up[k]||1,upName=k=>UPG[k].t[lv(k)].n,waterCap=()=>[0,100,160,250][lv('water')];
+function updateTools(){document.querySelectorAll('[data-tool]').forEach(b=>{const k=b.dataset.tool,l=lv(k);let em=b.querySelector('em');if(!em){em=document.createElement('em');b.appendChild(em)}em.textContent='★'.repeat(l-1);b.title=upName(k)})}
+function buyUp(k){const nx=UPG[k].t[lv(k)+1];if(!nx)return;if(G.money<nx.c){toast('👽 «No te alcanza, terrícola.»');return}
+ G.money-=nx.c;G.up[k]=lv(k)+1;if(k==='water')G.inv.agua=waterCap();alienExcite=2.5;updateTools();updateStats();save();toast(`👽 «¡${nx.i||UPG[k].i} ${nx.n} es tuya! Úsala bien, terrícola.»`,4500);openOxxo()}
+function openOxxo(){if(document.pointerLockElement)document.exitPointerLock();alienExcite=1.5;
+ const rows=Object.keys(UPG).map(k=>{const U=UPG[k],l=lv(k),nx=U.t[l+1];return `<p>${U.i} <b>${U.t[l].n}</b> <span style="color:var(--gold)">${'★'.repeat(l-1)}</span> · nivel ${l}/3${nx?`<br><span style="opacity:.85">→ ${nx.n} (${nx.c} 🪙): ${nx.d}</span>`:' · <b>¡máximo!</b>'}</p>`}).join('');
+ const b=Object.keys(UPG).filter(k=>UPG[k].t[lv(k)+1]).map(k=>{const nx=UPG[k].t[lv(k)+1];return {label:`${UPG[k].i} ${nx.n} · ${nx.c} 🪙`,fn:()=>buyUp(k)}});
+ b.push({label:'🌱 Semillas e insumos',fn:openShop},{label:'Salir',fn:closeModal});
+ openModal('👽 OXXO · Mostrador',`<p><i>«¡Bienvenido al OXXO, terrícola! Traigo herramientas de mi planeta. Aceptamos monedas de granja.»</i></p><p>Tus monedas: <b style="color:var(--gold)">${G.money}</b></p>${rows}<p style="font-size:15px;opacity:.8">Consejo para el experimento: compra las mejoras antes de sembrar un cuadro nuevo, así las 16 parcelas reciben lo mismo.</p>`,b)}
+scene.add(bake(stat));
+function assignLetters(){plots.forEach(p=>{p.letter=TREAT[G.sq[p.row][p.col]].k;p.label.material.map.dispose();p.label.material.dispose();p.label.material=labelMat(p)})}
+function soilTint(p){p.mat.color.copy(cDry).lerp(cWet,p.water/100*.8);if(p.ridges.visible!==p.tilled){p.ridges.visible=p.tilled;renderer.shadowMap.needsUpdate=true}}
+function outline(col){const l=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(2.95,.4,2.5)),new T.LineBasicMaterial({color:col}));l.visible=false;scene.add(l);return l}
+const hoverBox=outline(0xffe09a),selBox=outline(0x66e0ff);
+// ---------- MODELOS DE PLANTAS ----------
+const leafMats=[mat(0x39834b),mat(0x70a84b)],dryM=mat(0x8a7a3a),stemM=mat(0x47743b),brownM=mat(0x4a3320),fcache={};
+const fruitMat=c=>fcache[c]||(fcache[c]=mat(c,.55));
+const sph=(r,m,sx=1,sy=1,sz=1)=>{const o=new T.Mesh(new T.SphereGeometry(r,10,8),m);o.scale.set(sx,sy,sz);return o};
+function buildOne(p,C){const g=new T.Group(),st=p.stage,ok=p.health>=40,L=i=>ok?leafMats[i%2]:dryM,s=.32+st*.23,F=fruitMat(C.fruit);
+ const add=(o,x,y,z)=>{o.position.set(x,y,z);g.add(o);return o};const cyl=(a,b,h,m)=>new T.Mesh(new T.CylinderGeometry(a,b,h,7),m);
+ if(C.shape==='bush'){const h=(C.low?.3:.75)*s*1.25;add(cyl(.03,.05,h,stemM),0,h/2,0);
+  for(let j=0;j<3+st*2;j++){const a=j*2.4,o=add(sph((C.low?.15:.2)*s*1.2,L(j),1.4,.3,.7),Math.sin(a)*.3*s,.1+(j%3)*h*.28,Math.cos(a)*.3*s);o.rotation.y=a}
+  if(st>=3)for(let j=0;j<3;j++){const a=j*2.1;if(C.pepper){const f=add(new T.Mesh(new T.ConeGeometry(.06,.26,6),F),Math.sin(a)*.17,h*.7,Math.cos(a)*.17);f.rotation.x=Math.PI}else add(sph(C.low?.07:.1,F),Math.sin(a)*.17,C.low?.06:h*.75-j*.04,Math.cos(a)*.17)}}
+ else if(C.shape==='root'){for(let j=0;j<5+st*2;j++){const a=j*2.4,c=add(new T.Mesh(new T.ConeGeometry(.04,.55*s+.1,4),L(j)),Math.sin(a)*.16*s,.25*s+.05,Math.cos(a)*.16*s);c.rotation.z=Math.sin(a)*.5;c.rotation.x=Math.cos(a)*.5}
+  if(st>=3)for(let j=0;j<2;j++){if(C.fruit===0xe88b32){const c=add(new T.Mesh(new T.ConeGeometry(.07,.3,6),F),j?.14:-.14,.04,j?.08:-.06);c.rotation.x=Math.PI}else add(sph(.1,F,1.2,.8,1),j?.16:-.16,.04,j?.06:-.08)}}
+ else if(C.shape==='leafy'){for(let j=0;j<4+st*3;j++){const a=j*2.4,rad=(.05+j*.012*(1+st))*2;add(sph(.14+st*.025,L(j),1.2,.5,1.2),Math.sin(a)*rad,.06+j*.012,Math.cos(a)*rad)}}
+ else if(C.shape==='tall'){const h=1.9*s;add(cyl(.04,.06,h,stemM),0,h/2,0);const n=3+st*2;
+  for(let j=0;j<n;j++){const a=j*2.2,l=add(new T.Mesh(new T.BoxGeometry(.55*s+.2,.02,.1),L(j)),Math.sin(a)*.22,.25*h+(j/n)*h*.7,Math.cos(a)*.22);l.rotation.y=a;l.rotation.z=.4}
+  if(st>=2)add(new T.Mesh(new T.BoxGeometry(.04,.22,.04),fruitMat(0xcdb26b)),0,h+.08,0);
+  if(st>=3)for(let j=0;j<2;j++){const c=add(cyl(.06,.05,.3,F),j?.1:-.1,h*.55+j*.12,0);c.rotation.z=j?-.3:.3}}
+ else if(C.shape==='sun'){const h=1.6*s;add(cyl(.035,.05,h,stemM),0,h/2,0);for(let j=0;j<3;j++)add(sph(.2*s+.06,L(j),1.4,.25,.7),Math.sin(j*2.1)*.2,h*(.3+j*.2),Math.cos(j*2.1)*.2).rotation.y=j*2.1;
+  if(st>=2){const hg=new T.Group();hg.position.set(0,h,.05);hg.rotation.x=1.15;hg.add(cyl(.18,.18,.06,brownM));for(let j=0;j<12;j++){const a=j/12*Math.PI*2,pt=new T.Mesh(new T.BoxGeometry(.14,.03,.06),F);pt.position.set(Math.cos(a)*.27,0,Math.sin(a)*.27);pt.rotation.y=-a;hg.add(pt)}g.add(hg)}}
+ else{for(let j=0;j<5;j++){const a=j*1.26,r=.2+st*.1;add(sph(.2+st*.05,L(j),1.3,.25,.9),Math.sin(a)*r,.07,Math.cos(a)*r)}
+  if(st>=2)add(sph(.1,F),.12,.1,.1);if(st>=3)add(sph(.26,F,C.fruit===0xe3781f?1:1.3,.85,1),0,.2,0)}
+ return g}
+// ---------- MEDIDOR DE COSECHA ----------
+// Sprite pixelado junto a cada parcela; solo se redibuja cuando cambia el progreso
+function makeMeter(p){const c=document.createElement('canvas');c.width=64;c.height=210;const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.magFilter=T.NearestFilter;t.generateMipmaps=false;t.minFilter=T.LinearFilter;
+ const s=new T.Sprite(new T.SpriteMaterial({map:t,depthWrite:false}));s.scale.set(.32,1.05,1);s.position.set(p.x+(p.x<0?1.2:-1.2),1,p.z-.8);s.visible=false;scene.add(s);p.meter={s,c,t,key:''}}
+function drawMeter(p){const m=p.meter;if(!p.crop){m.s.visible=false;m.key='';return}m.s.visible=true;
+ const C=CROPS[p.crop],f=Math.min(1,p.days/C.days),ready=p.stage>=3,sick=p.health<40,key=f.toFixed(3)+ready+sick;if(key===m.key)return;m.key=key;if(!ready)m.s.scale.set(.32,1.05,1);
+ const x=m.c.getContext('2d'),top=30,H=150,h=Math.round(H*f);x.clearRect(0,0,64,210);
+ x.fillStyle='#000';x.fillRect(12,top-4,40,H+8);x.fillStyle='#333';x.fillRect(16,top,32,H);
+ x.fillStyle=sick?'#b8452e':ready?'#f2c933':f>.66?'#7ccf3a':f>.33?'#c8cf3a':'#d98b2b';x.fillRect(16,top+H-h,32,h);
+ x.fillStyle='rgba(255,255,255,.35)';x.fillRect(16,top+H-h,7,h);
+ x.fillStyle='rgba(0,0,0,.4)';for(let i=1;i<5;i++)x.fillRect(16,top+Math.round(i*H/5),32,3);
+ x.textAlign='center';x.lineWidth=5;x.strokeStyle='#000';x.fillStyle=ready?'#ffe066':'#fff';
+ x.font='26px VT323, monospace';const tt=ready?'100%':Math.round(f*100)+'%';x.strokeText(tt,32,22);x.fillText(tt,32,22);
+ if(ready){x.font='24px VT323, monospace';x.strokeText('¡LISTO!',32,206);x.fillText('¡LISTO!',32,206)}
+ else{x.font='20px VT323, monospace';const d=Math.max(0,C.days-p.days)+'d';x.strokeText(d,32,204);x.fillText(d,32,204)}
+ m.t.needsUpdate=true}
+function plantModel(p){if(p.meter)drawMeter(p);const key=p.crop?p.crop+p.stage+(p.health>=40):'';if(p.plant&&p.plantKey===key)return;p.plantKey=key;
+ if(p.plant){scene.remove(p.plant);p.plant.traverse(o=>{if(o.geometry)o.geometry.dispose()});p.plant=null;renderer.shadowMap.needsUpdate=true}
+ if(!p.crop)return;const C=CROPS[p.crop],g=new T.Group();
+ const spots=C.shape==='vine'?[[-.6,0],[.6,0]]:[[-.62,-.5],[.62,-.5],[-.62,.5],[.62,.5]];
+ spots.forEach((s,k)=>{const o=buildOne(p,C);o.position.set(s[0]+Math.sin(p.id*7+k*3)*.08,0,s[1]+Math.cos(p.id*5+k*2)*.08);o.rotation.y=k*1.7;g.add(o)});
+ g.traverse(o=>{if(o.isMesh)o.castShadow=true});const b=bake(g);b.position.set(p.x,.12,p.z);scene.add(b);p.plant=b;renderer.shadowMap.needsUpdate=true}
+// Lluvia
+const RN=500,rpos=new Float32Array(RN*6),rgeo=new T.BufferGeometry();rgeo.setAttribute('position',new T.BufferAttribute(rpos,3));
+const rain=new T.LineSegments(rgeo,new T.LineBasicMaterial({color:0xbfd8ff,transparent:true,opacity:.55}));rain.frustumCulled=false;rain.visible=false;scene.add(rain);
+const rseed=[];for(let i=0;i<RN;i++)rseed.push([(Math.random()-.5)*30,Math.random()*14,(Math.random()-.5)*30]);
+function updateRain(dt){if(!rain.visible)return;for(let i=0;i<RN;i++){const r=rseed[i];r[1]-=dt*22;if(r[1]<0)r[1]+=14;const x=camera.position.x+r[0],y=r[1],z=camera.position.z+r[2],j=i*6;rpos[j]=x;rpos[j+1]=y;rpos[j+2]=z;rpos[j+3]=x-.05;rpos[j+4]=y+.5;rpos[j+5]=z-.03}rgeo.attributes.position.needsUpdate=true}
+// ---------- CIELO DÍA/NOCHE ----------
+const cNight=new T.Color(0x0a1230),cGray=new T.Color(0x7b8791),cW=new T.Color(0xffffff),cSunW=new T.Color(0xfff1d0),cSunO=new T.Color(0xff9a55),cBlood=new T.Color(0xc0392b),cMoon=new T.Color(0xe8ecff);
+// Cielo del día: cambia cada mañana (color de día, de atardecer, nubosidad y niebla)
+const SKIES=[
+ {n:'Despejado',day:0x8cc6e6,dusk:0xf09a6a,cl:.3,fog:1.15},
+ {n:'Cúmulos',day:0x9bc9d5,dusk:0xf0a070,cl:1,fog:1},
+ {n:'Turquesa',day:0x78cfd2,dusk:0xf5b07a,cl:.55,fog:1.1},
+ {n:'Atardecer rosado',day:0xa3c4dc,dusk:0xf27ba8,cl:.7,fog:1},
+ {n:'Dorado',day:0xa9c9d9,dusk:0xffb347,cl:.5,fog:1},
+ {n:'Neblina',day:0xb9c6cb,dusk:0xd8a890,cl:.8,fog:.55}];
+SKIES.forEach(s=>{s.cd=new T.Color(s.day);s.cu=new T.Color(s.dusk)});
+// Eventos celestes: at = hora en que ocurren (y aplican su efecto)
+const SKYEV={
+ eclipse:{n:'Eclipse solar',i:'🌑',at:12.5,ok:()=>G.weather==='Soleado'||G.weather==='Calor',
+  fx:()=>{cropPlots().forEach(p=>{p.qb+=10;p.days++;p.wsum+=p.water;p.health=Math.min(100,p.health+5);p.stage=stageOf(p);plantModel(p)});return '¡Eclipse total! Los cultivos crecen +1 día, +10 de calidad y +5 de salud.'}},
+ aurora:{n:'Aurora boreal',i:'🌌',at:22,ok:()=>G.season>=2&&G.weather!=='Lluvia'&&G.weather!=='Tormenta',
+  fx:()=>{cropPlots().forEach(p=>{p.health=Math.min(100,p.health+10);p.qb+=5});return 'Aurora boreal: +10 de salud y +5 de calidad en todos los cultivos.'}},
+ meteors:{n:'Lluvia de estrellas',i:'☄️',at:21,ok:()=>G.weather!=='Lluvia'&&G.weather!=='Tormenta',
+  fx:()=>{G.xp+=15;const n=pick(CNAMES);G.inv.seeds[n]=(G.inv.seeds[n]||0)+2;return `Pediste un deseo: +15 XP y 2 semillas de ${n}.`}},
+ superluna:{n:'Superluna',i:'🌕',at:20,ok:()=>G.weather!=='Tormenta',
+  fx:()=>{cropPlots().forEach(p=>p.bonus+=.05);return 'Superluna: +5% de rendimiento en los cultivos actuales.'}},
+ sangre:{n:'Luna de sangre',i:'🔴',at:20,ok:()=>G.weather!=='Tormenta',
+  fx:()=>{let h=0;cropPlots().forEach(p=>{if(p.organic<60){p.health=Math.max(0,p.health-8);h++}});return `Luna de sangre: plagas nocturnas dañan ${h} parcela(s); el suelo con ≥60% de materia orgánica resiste.`}},
+ arcoiris:{n:'Arcoíris',i:'🌈',at:15,ok:()=>G.weather==='Lluvia',
+  fx:()=>{cropPlots().forEach(p=>p.qb+=6);G.market={m:Math.max(G.market.m,1.2),d:Math.max(G.market.d,1)};return 'Arcoíris: +6 de calidad y el mercado sube ×1.2 hoy.'}}};
+const skyName=()=>(SKIES[G.sky]||SKIES[1]).n+(G.skyEv?' + '+SKYEV[G.skyEv.k].n:'');
+const hhmm=h=>String(Math.floor(h)).padStart(2,'0')+':'+String(Math.round(h%1*60)).padStart(2,'0');
+function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'));const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;return t}
+const glow={transparent:true,opacity:0,depthWrite:false,fog:false,blending:T.AdditiveBlending};
+// Eclipse: disco oscuro que cruza el sol + corona
+const eclDisk=new T.Mesh(new T.SphereGeometry(4.15,16,12),new T.MeshBasicMaterial({color:0x06060a,fog:false}));eclDisk.visible=false;
+const corona=new T.Sprite(new T.SpriteMaterial({...glow,map:canvasTex(128,128,x=>{const g=x.createRadialGradient(64,64,18,64,64,64);g.addColorStop(0,'rgba(255,245,210,1)');g.addColorStop(.35,'rgba(255,225,170,.45)');g.addColorStop(1,'rgba(255,200,140,0)');x.fillStyle=g;x.fillRect(0,0,128,128)})}));corona.scale.setScalar(30);corona.visible=false;
+// Aurora: 3 cortinas que comparten material; la textura se desplaza para ondular
+const auroraMat=new T.MeshBasicMaterial({...glow,side:T.DoubleSide,map:canvasTex(256,128,x=>{for(let i=0;i<256;i++){const a=.2+.8*Math.abs(Math.sin(i*.09)*Math.sin(i*.023+1)),g=x.createLinearGradient(0,128,0,0);g.addColorStop(0,`rgba(80,255,160,${a})`);g.addColorStop(.55,`rgba(60,200,190,${a*.5})`);g.addColorStop(1,'rgba(150,80,255,0)');x.fillStyle=g;x.fillRect(i,0,1,128)}})});
+auroraMat.map.wrapS=T.RepeatWrapping;
+const aurora=new T.Group();for(let i=0;i<3;i++){const m=new T.Mesh(new T.PlaneGeometry(120,30),auroraMat),a=-Math.PI/2+(i-1)*.6;m.position.set(Math.cos(a)*125,44+i*5,Math.sin(a)*125);m.lookAt(0,44,0);aurora.add(m)}aurora.visible=false;
+// Arcoíris: un solo anillo con degradado radial
+const rainbow=new T.Mesh(new T.RingGeometry(50,58,64,1,0,Math.PI),new T.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,fog:false,side:T.DoubleSide,map:canvasTex(256,256,x=>{const g=x.createRadialGradient(128,128,128*50/58,128,128,128);['rgba(140,60,220,0)','rgba(140,60,220,.9)','rgba(60,90,255,.9)','rgba(60,200,90,.9)','rgba(250,230,60,.9)','rgba(255,150,40,.9)','rgba(240,50,50,.9)','rgba(240,50,50,0)'].forEach((s,i,a)=>g.addColorStop(i/(a.length-1),s));x.fillStyle=g;x.fillRect(0,0,256,256)})}));rainbow.visible=false;
+// Estrellas fugaces: un único LineSegments con 6 trazos reciclados
+const MN=6,mpos=new Float32Array(MN*6),mgeo=new T.BufferGeometry();mgeo.setAttribute('position',new T.BufferAttribute(mpos,3));
+const meteors=new T.LineSegments(mgeo,new T.LineBasicMaterial({...glow,color:0xfff6d8}));meteors.frustumCulled=false;meteors.visible=false;
+const mst=[...Array(MN)].map(()=>({age:-Math.random()*3,x:0,y:0,z:0,vx:0,vy:0,vz:0}));
+// Sol risueño (clima propio): sol de caricatura con cara, sustituye al disco solar ese día
+const happySun=new T.Sprite(new T.SpriteMaterial({fog:false,depthWrite:false,transparent:true,map:canvasTex(256,256,x=>{
+ x.translate(128,128);for(let i=0;i<16;i++){x.rotate(Math.PI/8);x.fillStyle=i%2?'#ffb627':'#ffd23f';x.beginPath();x.moveTo(-14,-70);x.lineTo(0,-124);x.lineTo(14,-70);x.fill()}
+ const g=x.createRadialGradient(-18,-22,10,0,0,74);g.addColorStop(0,'#fff6a8');g.addColorStop(.7,'#ffd23f');g.addColorStop(1,'#f5a623');x.fillStyle=g;x.beginPath();x.arc(0,0,74,0,Math.PI*2);x.fill();
+ x.fillStyle='rgba(255,120,120,.55)';[[-42,18],[42,18]].forEach(c=>{x.beginPath();x.ellipse(c[0],c[1],15,10,0,0,Math.PI*2);x.fill()});
+ x.fillStyle='#3b2410';[[-26,-14],[26,-14]].forEach(c=>{x.beginPath();x.ellipse(c[0],c[1],9,13,0,0,Math.PI*2);x.fill()});
+ x.fillStyle='#fff';[[-23,-19],[29,-19]].forEach(c=>{x.beginPath();x.arc(c[0],c[1],4,0,Math.PI*2);x.fill()});
+ x.strokeStyle='#3b2410';x.lineWidth=7;x.lineCap='round';x.beginPath();x.arc(0,8,30,.18*Math.PI,.82*Math.PI);x.stroke()})}));
+happySun.scale.setScalar(16);happySun.visible=false;
+// Imagen propia para el Sol risueño: se reduce a 256 px, se quita el fondo claro conectado a los bordes y se guarda
+const SUNKEY='harvestValleySun',drawnSun=happySun.material.map;
+function setSunMap(t){if(happySun.material.map!==drawnSun)happySun.material.map.dispose();happySun.material.map=t;happySun.material.needsUpdate=true}
+function setSunImage(url,store){const img=new Image();img.onload=()=>{const s=256,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d'),k=Math.min(s/img.width,s/img.height);
+ x.drawImage(img,(s-img.width*k)/2,(s-img.height*k)/2,img.width*k,img.height*k);
+ const d=x.getImageData(0,0,s,s),p=d.data,seen=new Uint8Array(s*s),st=[0,s-1,s*(s-1),s*s-1];
+ const bg=i=>{const o=i*4;return p[o+3]<20||(p[o]>195&&p[o+1]>195&&p[o+2]>195&&Math.max(p[o],p[o+1],p[o+2])-Math.min(p[o],p[o+1],p[o+2])<30)};
+ while(st.length){const i=st.pop();if(seen[i])continue;seen[i]=1;if(!bg(i))continue;p[i*4+3]=0;const X=i%s,Y=i/s|0;if(X>0)st.push(i-1);if(X<s-1)st.push(i+1);if(Y>0)st.push(i-s);if(Y<s-1)st.push(i+s)}
+ x.putImageData(d,0,0);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;setSunMap(t);
+ if(store){try{localStorage.setItem(SUNKEY,c.toDataURL('image/png'));toast('🖼️ Imagen del Sol risueño guardada')}catch(e){toast('Imagen aplicada (no se pudo guardar: es muy grande)')}}};
+ img.onerror=()=>toast('No se pudo leer esa imagen');img.src=url}
+try{const s=localStorage.getItem(SUNKEY);if(s)setSunImage(s,false)}catch(e){}
+scene.add(eclDisk,corona,aurora,rainbow,meteors,happySun);
+function updateMeteors(dt,night){const on=night>.3&&G.skyEv?.k==='meteors'&&G.t/60>=20;meteors.visible=on;if(!on)return;meteors.material.opacity=night;const c=camera.position;
+ for(let i=0;i<MN;i++){const m=mst[i],j=i*6;m.age+=dt;if(m.age>.7){m.age=-.4-Math.random()*2.2}
+  if(m.age<0){mpos.fill(0,j,j+6);continue}
+  if(m.age-dt<0||!m.vx){const a=Math.random()*Math.PI*2,b=a+Math.PI/2+(Math.random()-.5);m.x=Math.cos(a)*80;m.z=Math.sin(a)*80;m.y=55+Math.random()*30;m.vx=Math.cos(b)*75;m.vz=Math.sin(b)*75;m.vy=-20-Math.random()*15}
+  const hx=c.x+m.x+m.vx*m.age,hy=m.y+m.vy*m.age,hz=c.z+m.z+m.vz*m.age;mpos[j]=hx;mpos[j+1]=hy;mpos[j+2]=hz;mpos[j+3]=hx-m.vx*.12;mpos[j+4]=hy-m.vy*.12;mpos[j+5]=hz-m.vz*.12}
+ mgeo.attributes.position.needsUpdate=true}
+// Se llama una vez por día (no por frame): nubes, luna y niebla del cielo elegido
+function applySkyDay(){const S=SKIES[G.sky]||SKIES[1],wet=G.weather==='Lluvia'||G.weather==='Tormenta',n=Math.round((wet?1:S.cl)*clouds.length);
+ clouds.forEach((c,i)=>c.visible=i<n);scene.fog.near=28*S.fog;scene.fog.far=90*S.fog;
+ const k=G.skyEv?.k;moonMesh.scale.setScalar(k==='superluna'?1.9:k==='sangre'?1.3:1);moonMesh.material.color.copy(k==='sangre'?cBlood:cMoon)}
+function rollSky(){const w=G.weather;G.sky=w==='Lluvia'||w==='Tormenta'?1:w==='Nublado'?pick([1,5]):w==='Sol risueño'?pick([0,2]):Math.floor(Math.random()*SKIES.length);
+ G.skyEv=null;if(G.eventsOn&&Math.random()<.3){const c=Object.keys(SKYEV).filter(k=>SKYEV[k].ok());if(c.length)G.skyEv={k:pick(c),done:false}}applySkyDay()}
+function fireSky(){const e=G.skyEv;if(!e||e.done)return '';e.done=true;const E=SKYEV[e.k];return E.i+' '+E.fx()}
+let daylight=1,skyT=0;const dir=new T.Vector3(),perp=new T.Vector3(),UP=new T.Vector3(0,1,0),DIM={Soleado:1,'Sol risueño':1,Calor:1,Nublado:.72,Lluvia:.5,Tormenta:.38};
+function updateSky(dt){const H=G.t/60,h=H%24,a=(h-6)/12*Math.PI,el=Math.sin(a),S=SKIES[G.sky]||SKIES[1],k=G.skyEv?.k;skyT+=dt;
+ dir.set(Math.cos(a)*.9,el,.45).normalize();
+ const ecl=k==='eclipse'?clamp(1-Math.abs(H-12.5)/1.5,0,1):0;
+ const d0=clamp((el+.12)/.45,0,1),d=d0*(1-.9*ecl**3),tw=Math.max(0,1-Math.abs(el)/.28)*.65;daylight=d;
+ const dim=DIM[G.weather]||1;
+ sky.copy(cNight).lerp(S.cd,d).lerp(S.cu,tw*(dim>.6?1:.4)).lerp(cGray,(1-dim)*.6*d);scene.fog.color.copy(sky);
+ sun.position.copy(dir).multiplyScalar(26);sun.intensity=2.4*d*dim;sun.color.copy(cSunW).lerp(cSunO,tw);
+ hemi.intensity=.3+1.7*d*dim;moonL.position.copy(dir).multiplyScalar(-26);moonL.intensity=.55*(1-d0)*(k==='superluna'?1.8:1);
+ if(k==='sangre')moonL.color.copy(cBlood);else moonL.color.setHex(0x7f95d8);
+ sunMesh.position.copy(camera.position).addScaledVector(dir,120);moonMesh.position.copy(camera.position).addScaledVector(dir,-120);
+ sunMesh.visible=el>-.08&&dim>.6;moonMesh.visible=el<.08&&dim>.6;
+ happySun.visible=sunMesh.visible&&G.weather==='Sol risueño';
+ if(happySun.visible){sunMesh.visible=false;happySun.position.copy(camera.position).addScaledVector(dir,118);happySun.material.rotation=Math.sin(skyT*.9)*.15;happySun.scale.setScalar(16+Math.sin(skyT*2.2)*.6)}
+ stars.position.copy(camera.position);stars.material.opacity=(1-d)*(dim>.6?1:.25);
+ cloudMat.color.copy(cW).lerp(cGray,(1-dim)*.9).multiplyScalar(.2+.8*d);
+ lamp.intensity=(1-d)*22;winMat.emissiveIntensity=(1-d)*1.6;
+ rain.visible=G.weather==='Lluvia'||G.weather==='Tormenta';
+ // Eclipse
+ eclDisk.visible=corona.visible=ecl>0&&sunMesh.visible;
+ if(eclDisk.visible){perp.crossVectors(dir,UP).normalize();eclDisk.position.copy(camera.position).addScaledVector(dir,118).addScaledVector(perp,(H-12.5)/1.5*8.3);
+  corona.position.copy(camera.position).addScaledVector(dir,121);corona.material.opacity=ecl**4*.9}
+ // Aurora (de noche)
+ aurora.visible=k==='aurora'&&H>=20&&d0<.5;
+ if(aurora.visible){aurora.position.copy(camera.position);auroraMat.map.offset.x=skyT*.015;auroraMat.opacity=(1-d0)*(.55+.25*Math.sin(skyT*.8))}
+ // Arcoíris (tarde, en el lado opuesto al sol)
+ rainbow.visible=k==='arcoiris'&&H>=14&&H<18.5&&d0>.3;
+ if(rainbow.visible){perp.set(-dir.x,0,-dir.z).normalize();rainbow.position.copy(camera.position).addScaledVector(perp,110);rainbow.position.y=camera.position.y-6;rainbow.lookAt(camera.position);rainbow.material.opacity=.5*Math.min(1,(H-14)*2,(18.5-H)*2)}
+ updateMeteors(dt,1-d0)}
+// ---------- ESTADO / UI ----------
+let tool='hoe',selected=null,yaw=0,pitch=-.2;
+const keys={},move={};
+function toast(t,ms=2400){const el=$('toast');el.textContent=t;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',ms)}
+function msg(t){$('message').textContent=t}
+let seedHTML='';
+function updateSeedSel(){const s=$('seedSel'),h=CNAMES.map(n=>`<option value="${n}">${CROPS[n].i} ${n} (${G.inv.seeds[n]||0})</option>`).join('');if(h!==seedHTML){seedHTML=h;s.innerHTML=h}s.value=G.seedSel}
+const clockText=()=>{const h=(G.t/60)%24,hh=Math.floor(h),mm=Math.floor((h-hh)*60);return (h>=6&&h<19?'☀️ ':'🌙 ')+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')};
+$('seedSel').onchange=e=>{G.seedSel=e.target.value;msg('Semilla elegida: '+G.seedSel)};
+function updateStats(){
+ while(G.xp>=G.level*20){G.xp-=G.level*20;G.level++;toast('¡Subiste al nivel '+G.level+'!')}
+ $('day').textContent=`Día ${G.day} · ${SEASONS[G.season]}`;$('clock').textContent=clockText();
+ $('temp').textContent=G.temp+'°C';$('weather').textContent=G.weather;$('money').textContent=G.money;$('xp').textContent=`Nivel ${G.level} · ${G.xp} XP`;$('xpfill').style.width=Math.min(100,G.xp/(G.level*20)*100)+'%';$('xplvl').textContent=G.level;$('agua').textContent=G.inv.agua;
+ const parts=['🌤️ Cielo: '+(SKIES[G.sky]||SKIES[1]).n];if(G.skyEv){const E=SKYEV[G.skyEv.k];parts.push(`${E.i} ${E.n} ${G.skyEv.done?'(ya ocurrió)':'a las '+hhmm(E.at)}`)}if(G.evText)parts.push('🎲 '+G.evText);if(G.market.d>0)parts.push(`📈 Mercado ×${G.market.m} (${G.market.d} d)`);const eb=$('eventbar');eb.style.display=parts.length?'block':'none';eb.textContent=parts.join('  ·  ');updateSeedSel()}
+const modalEl=$('modal'),modalOpen=()=>modalEl.style.display==='block';
+function openModal(title,body,buttons){if(document.pointerLockElement)document.exitPointerLock();$('mtitle').textContent=title;$('mbody').innerHTML=body;const b=$('mbuttons');b.innerHTML='';buttons.forEach(o=>{const el=document.createElement('button');el.textContent=o.label;el.className=o.wide?'wide':'';el.onclick=o.fn;b.appendChild(el)});$('modal').style.display='block'}
+function closeModal(){$('modal').style.display='none'}
+$('close').onclick=closeModal;
+$('sunFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{setSunImage(r.result,true);G.weather='Sol risueño';G.t=Math.max(G.t,600);applySkyDay();updateStats();closeModal();save()};r.readAsDataURL(f);e.target.value=''};
+const toolName=()=>upName(tool)+({seed:' · '+G.seedSel,fert:' (tratamiento de la parcela)'}[tool]||'');
+function stageOf(p){const C=CROPS[p.crop];return p.days>=C.days?3:Math.min(2,Math.floor(p.days/(C.days/3)))}
+function plantCrop(p,name){if((G.inv.seeds[name]||0)<1)return false;G.inv.seeds[name]--;Object.assign(p,{crop:name,stage:0,days:0,health:100,wsum:0,applied:false,bonus:0,qb:0});
+ const u=lv('seed');if(u>=2){p.days=u-1;p.wsum=p.water*p.days;p.stage=stageOf(p)}if(u>=3)p.qb=5;plantModel(p);return true}
+function selectPlot(p){selected=p;selBox.visible=!!p;if(p){selBox.position.set(p.x,.15,p.z);msg('Parcela '+p.id+' · '+(p.crop||'Vacía')+' · Humedad '+Math.round(p.water)+'%');openPlot(p)}}
+function openPlot(p){const C=p.crop&&CROPS[p.crop],tr=TREAT['ABCD'.indexOf(p.letter)];
+ const d=`<p><b>Posición:</b> Fila ${p.row+1} · Columna ${p.col+1} · <b>Tratamiento ${p.letter}</b> — ${tr.n} ${p.applied?'(aplicado ✔)':'(pendiente)'}</p>
+ <p><b>Cultivo:</b> ${p.crop?C.i+' '+p.crop+' · etapa '+(p.stage+1)+'/4 · faltan '+Math.max(0,C.days-p.days)+' días':'Sin cultivo'}</p>
+ <p>Humedad: ${Math.round(p.water)}% · Salud: ${Math.round(p.health)}%</p><p>NPK: ${Math.round(p.n)}/${Math.round(p.p)}/${Math.round(p.k)} · pH ${p.ph.toFixed(1)} · Mat. orgánica ${Math.round(p.organic)}%</p>
+ ${C?`<p>Estaciones ideales: ${C.sp.map(s=>SEASONS[s]).join(', ')} · pH ideal ${C.ph[0]}–${C.ph[1]}</p>`:''}<p><b>Herramienta:</b> ${toolName()}</p>`;
+ const b=[{label:'Usar herramienta',fn:()=>{closeModal();useTool(p)}},{label:'Cerrar',fn:closeModal}];
+ if(!p.crop)b.unshift({label:`Sembrar ${G.seedSel}`,wide:true,fn:()=>{if(!plantCrop(p,G.seedSel)){toast('No tienes semillas de '+G.seedSel);return}closeModal();updateStats();toast(G.seedSel+' sembrado')}});
+ openModal('Parcela '+p.id,d,b)}
+function quality(p){const score=(p.health*.35)+(Math.min(p.n,p.p,p.k)*.25)+(Math.max(0,100-Math.abs(p.water-65))*.2)+(p.ph>=5.8&&p.ph<=7.2?15:5)+(G.level*2)+(p.qb||0)+(lv('harvest')-1)*5;return score>=90?'Iridio':score>=76?'Oro':score>=58?'Plata':'Normal'}
+function calcYield(p){const C=CROPS[p.crop],aw=p.days?p.wsum/p.days:p.water,wf=Math.max(.5,1-Math.abs(aw-65)/150),nf=.75+.25*Math.min(p.n,p.p,p.k)/100,phf=(p.ph>=C.ph[0]&&p.ph<=C.ph[1])?1:.9,hf=.35+.65*p.health/100,te=p.applied?TREAT['ABCD'.indexOf(p.letter)].eff:1;
+ return +(C.kg*hf*wf*nf*phf*te*G.rowEff[p.row]*G.colEff[p.col]*(1+gauss()*.05)*(1+p.bonus)).toFixed(2)}
+function useTool(p){if(!p){toast('Apunta a una parcela cercana');return}
+ if(tool==='hoe'){if(p.crop){toast('No puedes arar una parcela ocupada');return}const u=lv('hoe'),first=!p.tilled;p.tilled=true;soilTint(p);G.xp+=1;
+  if(first&&u>=2){p.organic=Math.min(100,p.organic+(u>=3?12:6));G.xp+=u-1;if(u>=3){p.n=Math.min(100,p.n+3);p.p=Math.min(100,p.p+3);p.k=Math.min(100,p.k+3)}}
+  toast(first&&u>=2?`${upName('hoe')}: tierra preparada y enriquecida`:'Tierra removida y preparada')}
+ else if(tool==='seed'){if(p.crop){toast('La parcela ya tiene un cultivo');return}if(!plantCrop(p,G.seedSel)){toast('No tienes semillas de '+G.seedSel+' (compra en la tienda)');return}toast(G.seedSel+' sembrado')}
+ else if(tool==='water'){if(G.inv.agua<=0){toast('Regadera vacía: rellénala en el estanque 💧 (o al dormir)');return}
+  const u=lv('water'),amt=[0,38,45,50][u],tg=u>=3?plots.filter(q=>q.row===p.row&&Math.abs(q.col-p.col)<=1):[p];
+  tg.forEach(q=>{q.water=Math.min(100,q.water+(q===p?amt:amt*.6));soilTint(q)});G.inv.agua=Math.max(0,G.inv.agua-(u>=2?5:6));
+  toast(`${upName('water')}: humedad ${Math.round(p.water)}%`+(tg.length>1?` · también ${tg.length-1} parcela(s) vecina(s)`:''))}
+ else if(tool==='fert'){const tr=TREAT['ABCD'.indexOf(p.letter)];if(p.applied){toast('Esta parcela ya recibió su tratamiento '+p.letter);return}
+  if(G.inv.compost<tr.compost||G.inv.npk<tr.npk){toast(`Faltan insumos para el tratamiento ${tr.k} (${tr.n})`);return}
+  G.inv.compost-=tr.compost;G.inv.npk-=tr.npk;const fm=[0,1,1.25,1.5][lv('fert')];
+  if(tr.compost){p.n=Math.min(100,p.n+20*fm);p.p=Math.min(100,p.p+12*fm);p.k=Math.min(100,p.k+15*fm);p.organic=Math.min(100,p.organic+15*fm)}
+  if(tr.npk){p.n=Math.min(100,p.n+30*fm);p.p=Math.min(100,p.p+20*fm);p.k=Math.min(100,p.k+20*fm)}p.applied=true;toast(`Tratamiento ${tr.k} aplicado: ${tr.n}`)}
+ else if(tool==='harvest'){if(!p.crop||p.stage<3){toast('Todavía no está listo para cosechar');return}
+  const C=CROPS[p.crop],q=quality(p),kg=calcYield(p),mult={Normal:1,Plata:1.5,Oro:2,Iridio:3}[q],val=Math.round(C.price*mult*G.market.m*[0,1,1.15,1.35][lv('harvest')]);
+  G.records.push({obs:G.records.length+1,cuadro:G.sqn,parcela:p.id,fila:p.row+1,col:p.col+1,trat:p.letter,compost:TREAT['ABCD'.indexOf(p.letter)].compost,npk:TREAT['ABCD'.indexOf(p.letter)].npk,aplic:p.applied?1:0,cultivo:p.crop,kg,calidad:q,hum:+(p.wsum/Math.max(1,p.days)).toFixed(1),n:Math.round(p.n),p:Math.round(p.p),k:Math.round(p.k),ph:+p.ph.toFixed(1),mo:Math.round(p.organic),salud:Math.round(p.health),dias:p.days,dia:G.abs,temp:G.temp,cielo:skyName(),ev:G.evText||'ninguno'});
+  G.money+=val;G.inv.cosechas++;toast(`${C.i} ${p.crop}: ${kg} kg · ${q} · +${val} monedas · dato registrado`);
+  Object.assign(p,{crop:null,stage:0,days:0,health:100,wsum:0,applied:false,bonus:0,qb:0,tilled:false,water:Math.min(p.water,40)});plantModel(p);soilTint(p)}
+ G.xp+=2;updateStats();save()}
+// ---------- EVENTOS ALEATORIOS ----------
+const cropPlots=()=>plots.filter(p=>p.crop);
+const EVENTS=[
+ {ok:s=>s<=1,f:()=>{G.ev={kind:'heat',days:2,name:'Ola de calor'};G.weather='Calor';G.temp+=9;return 'Ola de calor (2 días): mayor evaporación, ¡riega más!'}},
+ {ok:s=>s>=1,f:()=>{G.ev={kind:'drought',days:3,name:'Sequía'};if(G.weather==='Lluvia')G.weather='Soleado';return 'Sequía (3 días): no habrá lluvia y el suelo se seca más rápido.'}},
+ {ok:s=>s>=2,f:()=>{G.temp=-2;G.weather='Nublado';return 'Helada: los cultivos sensibles al frío sufren daño.'}},
+ {ok:()=>true,f:()=>{const c=perm(plots.length).map(i=>plots[i]).filter(p=>p.crop).slice(0,3);let h=0,r=0;c.forEach(p=>{if(p.organic>=60)r++;else{p.health=Math.max(0,p.health-22);h++}});return c.length?`Plaga de pulgones: ${h} parcela(s) afectada(s)${r?`, ${r} resistió por suelo rico en materia orgánica`:''}.`:'Plaga de pulgones: no había cultivos que dañar.'}},
+ {ok:()=>true,f:()=>{G.weather='Tormenta';cropPlots().forEach(p=>p.health=Math.max(0,p.health-15));return 'Tormenta con granizo: todos los cultivos pierden salud.'}},
+ {ok:()=>true,f:()=>{G.weather='Lluvia';cropPlots().forEach(p=>p.health=Math.min(100,p.health+5));return 'Lluvia benéfica: el campo se hidrata solo.'}},
+ {ok:()=>true,f:()=>{cropPlots().forEach(p=>{if(p.stage>=1&&p.health>50)p.bonus=.08});return 'Llegaron polinizadores: bonus de rendimiento en cultivos sanos.'}},
+ {ok:()=>true,f:()=>{G.market={m:1.5,d:2};return 'Mercado en auge: ventas ×1.5 durante 2 días.'}},
+ {ok:()=>true,f:()=>{const n=pick(CNAMES);G.inv.seeds[n]=(G.inv.seeds[n]||0)+3;G.money+=20;return `Un visitante generoso te regala 3 semillas de ${n} y 20 monedas.`}},
+ {ok:()=>true,f:()=>{plots.forEach(p=>p.organic=Math.min(100,p.organic+10));return 'Las lombrices mejoraron el suelo: +10% de materia orgánica.'}},
+ {ok:()=>true,f:()=>{const c=cropPlots().filter(p=>p.stage<2);if(!c.length)return 'Conejos merodean, pero no encontraron brotes.';const p=pick(c);p.crop=null;p.stage=0;p.days=0;plantModel(p);return `Conejos se comieron los brotes de la parcela ${p.id}.`}}
+];
+function nextDay(forced){closeModal();
+ const slept=fireSky();// si dormiste antes del evento celeste, su efecto se aplica igual
+ if(G.ev&&--G.ev.days<=0)G.ev=null;
+ G.abs++;G.day++;if(G.day>28){G.day=1;G.season=(G.season+1)%4}
+ G.temp=[20,29,19,8][G.season]+Math.round(Math.random()*7-3);G.weather=pick(['Soleado','Soleado','Nublado','Lluvia','Calor']);
+ if(G.season<=1&&Math.random()<.12)G.weather='Sol risueño';// clima raro de primavera/verano
+ if(G.market.d>0&&--G.market.d<=0)G.market={m:1,d:0};
+ plots.forEach(p=>p.bonus=p.crop?p.bonus:0);
+ if(G.ev){if(G.ev.kind==='heat'){G.weather='Calor';G.temp+=9}if(G.ev.kind==='drought'&&G.weather==='Lluvia')G.weather='Soleado'}
+ G.evText=G.ev?G.ev.name+' (continúa)':'';
+ if(!G.ev&&G.eventsOn&&Math.random()<.4)G.evText=pick(EVENTS.filter(e=>e.ok(G.season))).f();
+ rollSky();
+ const delta={Soleado:-17,'Sol risueño':-13,Calor:-24,Nublado:-11,Lluvia:30,Tormenta:40}[G.weather]||-11;let lost=0;
+ plots.forEach(p=>{let dw=delta;if(dw<0&&!p.crop)dw*=.5;if(G.ev&&G.ev.kind==='drought'&&p.crop)dw-=12;if(G.ev&&G.ev.kind==='heat'&&p.crop)dw-=8;p.water=clamp(p.water+dw,0,100);
+  if(p.crop){const C=CROPS[p.crop];p.wsum+=p.water;let dh=0;if(p.water<20||p.water>95)dh-=12;else dh+=3;
+   if(G.temp>34)dh-=15;if(G.temp<0)dh-=C.frost?10:25;else if(G.temp<8&&!C.frost)dh-=15;
+   if(G.weather==='Sol risueño'){dh+=4;p.qb=(p.qb||0)+3}
+   if(!C.sp.includes(G.season))dh-=5;if(p.n<20||p.p<15||p.k<15)dh-=8;
+   p.n=Math.max(0,p.n-3);p.p=Math.max(0,p.p-1.5);p.k=Math.max(0,p.k-2.5);
+   p.health=clamp(p.health+dh,0,100);if(p.health>25)p.days++;p.stage=stageOf(p);
+   if(p.health<=0){lost++;p.crop=null;p.stage=0;p.days=0;p.applied=false}plantModel(p)}soilTint(p)});
+ G.inv.agua=waterCap();G.t=360;updateStats();
+ const se=G.skyEv&&SKYEV[G.skyEv.k];
+ toast((slept?'Mientras dormías: '+slept+' ':'')+(forced?'Te quedaste dormido de madrugada. ':'')+`Nuevo día · ${G.weather} ${G.temp}°C · cielo ${SKIES[G.sky].n}`+(G.weather==='Sol risueño'?' · 😊 Sol risueño: +4 salud y +3 calidad hoy':'')+(se?` · ${se.i} Hoy:${se.n} a las ${hhmm(se.at)}`:'')+(G.evText?' · 🎲 '+G.evText:'')+(lost?` · ${lost} cultivo(s) se perdieron por estrés`:''),6500);save()}
+// ---------- DATOS PARA MINITAB ----------
+const COLS=[['Obs','obs'],['Cuadro','cuadro'],['Parcela','parcela'],['Fila','fila'],['Columna','col'],['Tratamiento','trat'],['Compost','compost'],['NPK','npk'],['Aplicado','aplic'],['Cultivo','cultivo'],['Rendimiento_kg','kg'],['Calidad','calidad'],['Humedad_prom','hum'],['N','n'],['P','p'],['K','k'],['pH','ph'],['MO','mo'],['Salud','salud'],['Dias_cultivo','dias'],['Dia_cosecha','dia'],['Temp','temp'],['Cielo','cielo'],['Evento','ev']];
+const NUMK=new Set(['obs','cuadro','parcela','fila','col','compost','npk','aplic','kg','hum','n','p','k','ph','mo','salud','dias','dia','temp']);
+// Tablas siempre rectangulares: una fila de encabezados y una fila por observación.
+// miss: '*' = celda vacía numérica para Minitab, '' para Excel. Decimal según G.dec.
+const MINI={sep:'\t',miss:'*'},XLS={sep:'\t',miss:''};
+const csvSep=()=>G.dec===','?';':',';
+function grid(head,isNum,rows,o){const clean=v=>String(v??'').replace(/[,;\t\r\n"]/g,' ').trim();
+ return [head.join(o.sep),...rows.map(r=>r.map((v,i)=>isNum[i]?(v===null||v===undefined||v===''?o.miss:String(v).replace('.',G.dec)):clean(v)).join(o.sep))].join('\r\n')}
+const allText=o=>grid(COLS.map(c=>c[0]),COLS.map(c=>NUMK.has(c[1])),G.records.map(r=>COLS.map(c=>r[c[1]])),o);
+function lastOf(){const last={};G.records.forEach(r=>{if(r.cuadro===G.sqn)last[r.parcela]=r});return last}
+// Cuadro actual: 16 filas, lista para el GLM del cuadro latino
+// Formato DOE de Minitab: las 4 primeras columnas son las que pide «Definir diseño factorial personalizado ▸ Diseño»
+// (orden estándar 2² dentro de cada réplica, orden de corrida = parcela, todos puntos de esquina, bloque = fila del cuadro).
+// Compost/NPK son lo que la parcela recibió de verdad: si el tratamiento no se aplicó, cuenta como 0/0.
+const SQH=['OrdenEst','OrdenCorrida','PtCentral','Bloques','Compost','NPK','Rendimiento_kg','Fila','Columna','Parcela','Tratamiento','Aplicado','Cultivo','Calidad'],SQN=[1,1,1,1,1,1,1,1,1,1,0,1,0,0];
+function squareRows(){const last=lastOf();return plots.map(p=>{const r=last[p.id],t=TREAT['ABCD'.indexOf(p.letter)],ap=r?(r.aplic===0?0:1):1;
+ return [p.row*4+'ABCD'.indexOf(p.letter)+1,p.id,1,p.row+1,t.compost*ap,t.npk*ap,r?r.kg:null,p.row+1,p.col+1,p.id,p.letter,r?ap:null,r?r.cultivo:(p.crop||''),r?r.calidad:'']}).sort((a,b)=>a[0]-b[0])}
+function squareStats(){const last=lastOf(),rs=plots.map(p=>last[p.id]).filter(Boolean);return {n:rs.length,noAp:rs.filter(r=>r.aplic===0).length,crops:[...new Set(rs.map(r=>r.cultivo))]}}
+const squareText=o=>grid(SQH,SQN,squareRows(),o);
+// Réplicas en formato ancho: 4 filas × 4 tratamientos, un solo encabezado
+const REPH=['Replica','A_Control','B_Compost','C_NPK','D_Compost_NPK'];
+function repRows(){const last=lastOf();return [0,1,2,3].map(r=>[r+1,...'ABCD'.split('').map(L=>{const x=last[plots.find(q=>q.row===r&&q.letter===L).id];return x?x.kg:null})])}
+const repText=o=>grid(REPH,[1,1,1,1,1],repRows(),o);
+const MTB=`Describe 'Rendimiento_kg';
+  By 'Tratamiento'.
+Boxplot 'Rendimiento_kg'*'Tratamiento'.
+GLM;
+  Response 'Rendimiento_kg';
+  Nodefault;
+  Categorical 'Fila' 'Columna' 'Tratamiento';
+  Terms Fila Columna Tratamiento;
+  TMethod;
+  TFactor;
+  TAnova;
+  TSummary;
+  TCoefficients.
+GLM;
+  Response 'Rendimiento_kg';
+  Nodefault;
+  Categorical 'Fila' 'Columna' 'Compost' 'NPK';
+  Terms Fila Columna Compost NPK Compost*NPK;
+  TMethod;
+  TFactor;
+  TAnova;
+  TSummary;
+  TCoefficients.`;
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function showText(t){openModal('Copia manual',`<p>El navegador bloqueó el portapapeles o la descarga. El texto ya está seleccionado: pulsa Ctrl+C (o mantén pulsado y copia) y pégalo en Minitab o Excel. Si es el CSV, guárdalo como .csv.</p><textarea id="manual" readonly style="width:100%;height:190px;background:#0f1a13;color:#f4f0df;border:1px solid #6b866d;border-radius:8px;padding:8px;font:12px monospace">${esc(t)}</textarea>`,[{label:'← Volver a datos',wide:true,fn:openData}]);setTimeout(()=>{const a=$('manual');if(a){a.focus();a.select()}},60)}
+// Copia dentro del mismo clic (funciona también abriendo el archivo con file://); si el navegador lo bloquea,
+// prueba la API del portapapeles y, como último recurso, muestra el texto seleccionado para Ctrl+C
+function copyText(t,ok){let r=false;
+ try{const x=document.createElement('textarea');x.value=t;x.setAttribute('readonly','');x.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0';
+  document.body.appendChild(x);x.focus();x.select();x.setSelectionRange(0,t.length);r=document.execCommand('copy');x.remove()}catch(e){}
+ if(r){toast(ok,4500);return}
+ if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(()=>toast(ok,4500)).catch(()=>showText(t));else showText(t)}
+function dl(name,text){try{const b=new Blob(['﻿'+text],{type:name.endsWith('.txt')?'text/plain;charset=utf-8':'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);return true}catch(e){showText(text);return false}}
+const needData=()=>{if(G.records.length)return true;toast('Aún no hay datos: cosecha al menos una parcela');return false};
+function downloadCSV(){if(!needData())return;if(dl('cuadro_latino_harvest_valley.csv',allText({sep:csvSep(),miss:''})))toast(`CSV generado (${G.records.length} obs., separador «${csvSep()}», decimal «${G.dec}»).`,4500)}
+const PASTE='Pégala en Minitab haciendo clic en la celda gris de nombres (bajo C1) y Ctrl+V';
+function copyTable(){if(needData())copyText(allText(MINI),'Tabla completa copiada. '+PASTE)}
+function copySquare(){copyText(squareText(MINI),'Tabla DOE copiada (16 filas). '+PASTE)}
+// Copia la tabla DOE y muestra la ruta exacta de menús en Minitab
+function openMinitabDOE(){copySquare();const s=squareStats(),warn=[];
+ if(s.n<16)warn.push(`Solo ${s.n} de 16 parcelas cosechadas en este cuadro: las demás salen como * (faltante) y Minitab las omite.`);
+ if(s.n&&s.noAp===s.n)warn.push('<b>Ningún tratamiento se aplicó en este cuadro</b>: Compost y NPK quedan todos en 0 y Minitab no podrá estimar efectos. En la próxima siembra usa la herramienta 4 (Abonar) en las 16 parcelas antes de cosechar.');
+ else if(s.noAp)warn.push(`${s.noAp} parcela(s) se cosecharon sin aplicar su tratamiento: se exportan como Compost 0 / NPK 0 (lo que de verdad recibieron).`);
+ if(s.crops.length>1)warn.push(`Hay varios cultivos (${s.crops.join(', ')}): para un análisis válido siembra el mismo en las 16.`);
+ const st=(n,t)=>`<p><b style="color:var(--gold)">${n}.</b> ${t}</p>`;
+ openModal('📋 Minitab · Análisis factorial',`<p>✅ Ya está copiada en el portapapeles la tabla del cuadro nº ${G.sqn} en formato DOE (16 filas).</p>
+ ${warn.length?`<p style="color:#ffb3a3">⚠️ ${warn.join('<br>⚠️ ')}</p>`:''}
+ ${st(1,'En Minitab haz clic en la <b>celda gris de nombres bajo C1</b> y pulsa <b>Ctrl+V</b>. Las opciones del menú DOE solo se activan cuando la hoja activa tiene datos.')}
+ ${st(2,'<b>Estadísticas ▸ DOE ▸ Factorial ▸ Definir diseño factorial personalizado…</b><br><span style="opacity:.8">(inglés: Stat ▸ DOE ▸ Factorial ▸ Define Custom Factorial Design…)</span><br>Factores: <b>Compost</b> y <b>NPK</b> · deja marcado «2 niveles factoriales» (2-level factorial). <i>No uses «Crear diseño factorial» (Create Factorial Design): ese genera un experimento nuevo vacío.</i>')}
+ ${st(3,'Botón <b>Diseño…</b> (Designs…): en cada casilla elige «Especificar por columna» (Specify by column) con <b>OrdenEst</b>, <b>OrdenCorrida</b>, <b>PtCentral</b> y <b>Bloques</b> ▸ Aceptar ▸ Aceptar.<br><span style="opacity:.8">(Bajo = 0 y Alto = 1 se detectan solos.)</span>')}
+ ${st(4,'<b>Estadísticas ▸ DOE ▸ Factorial ▸ Analizar diseño factorial…</b> <span style="opacity:.8">(Analyze Factorial Design…)</span><br>Respuestas (Responses): <b>Rendimiento_kg</b> ▸ Aceptar. Incluye los bloques y la interacción Compost*NPK.')}
+ ${st(5,'Opcional: <b>Estadísticas ▸ DOE ▸ Factorial ▸ Gráficas factoriales…</b> <span style="opacity:.8">(Factorial Plots…)</span> para ver efectos principales e interacción.')}
+ <p style="font-size:15px;opacity:.85">Lectura: valor p &lt; 0.05 en Compost, NPK o Compost*NPK = efecto significativo. Bloques = filas del cuadro (cada fila es una réplica completa del 2²). El menú DOE solo admite un bloque; si quieres también la Columna, usa los «Comandos Minitab» (GLM).</p>`,
+ [{label:'📋 Copiar otra vez',fn:copySquare},{label:'⬇️ Descargar .txt',fn:()=>{if(dl('cuadro_'+G.sqn+'_DOE_minitab.txt',squareText(MINI)))toast('TXT generado: en Minitab, Archivo ▸ Abrir y luego sigue desde el paso 2',5000)}},
+  {label:'🧮 Comandos Minitab',fn:openCommands},{label:'← Volver a datos',fn:openData}])}
+function openReplicas(){const rows=repRows(),last=lastOf(),td='border:1px solid #6b866d;padding:6px';
+ let h=`<p>Cada fila del cuadro latino es una réplica completa del factorial 2² (Compost × NPK). Una sola fila de encabezados y una fila por réplica: se pega limpia en Excel o Minitab. Valores en kg.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px"><tr>${REPH.map(x=>`<th style="${td};background:#3a2a1c">${x}</th>`).join('')}</tr>`;
+ rows.forEach((r,ri)=>{h+=`<tr><th style="${td}">${r[0]}</th>`+r.slice(1).map((v,i)=>{const p=plots.find(q=>q.row===ri&&q.letter==='ABCD'[i]);return `<td style="${td}">${v!==null?`<b>${String(v).replace('.',G.dec)}</b>`:(p.crop?CROPS[p.crop].i:'·')}<div style="font-size:10px;opacity:.7">P${p.id}</div></td>`}).join('')+'</tr>'});
+ const means=[0,1,2,3].map(i=>{const v=rows.map(r=>r[i+1]).filter(x=>x!==null);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2).replace('.',G.dec):'–'});
+ h+=`<tr><th style="${td};color:var(--gold)">Media</th>${means.map(m=>`<td style="${td};color:var(--gold)">${m}</td>`).join('')}</tr></table></div><p style="font-size:12px">🍅 = creciendo · · = sin sembrar. La fila «Media» solo se muestra aquí, no se copia. En Excel las celdas sin dato quedan vacías; en Minitab se pegan como * (faltante numérico).</p>`;
+ openModal('📑 Tabla por réplicas',h,[{label:'📋 Copiar para Excel',fn:()=>copyText(repText(XLS),'Tabla copiada: pégala en la celda A1 de Excel')},{label:'📋 Copiar para Minitab',fn:()=>copyText(repText(MINI),'Tabla copiada. '+PASTE)},
+  {label:'⬇️ CSV réplicas',fn:()=>{if(dl('replicas_cuadro_'+G.sqn+'.csv',repText({sep:csvSep(),miss:''})))toast('CSV de réplicas generado')}},{label:'← Volver a datos',fn:openData}])}
+function openCommands(){openModal('🧮 Comandos de Minitab',`<p><b>1.</b> Copia el <b>cuadro actual</b> (o la tabla completa) y pégalo en Minitab haciendo clic en la <b>celda gris de nombres bajo C1</b>; así la primera fila se convierte en los nombres de columna y no aparecen filas «Missing».</p>
+ <p><b>2.</b> Abre la línea de comandos (<b>Ctrl+L</b>, o menú Ver ▸ Línea de comandos/Historial), pega estos comandos y pulsa <b>Ejecutar</b>.</p>
+ <p>Hacen: estadística descriptiva por tratamiento, diagrama de caja, ANOVA del cuadro latino (Fila + Columna + Tratamiento) y el factorial 2² con bloques (Compost × NPK).</p>
+ <textarea readonly style="width:100%;height:170px;background:#0f1a13;color:#f4f0df;border:1px solid #6b866d;border-radius:8px;padding:8px;font:12px monospace">${esc(MTB)}</textarea>
+ <p style="font-size:12px">Para comparaciones de Tukey: Estadísticas ▸ ANOVA ▸ Modelo lineal general ▸ Comparaciones, después de ejecutar el GLM.</p>`,
+ [{label:'📋 Copiar comandos',fn:()=>copyText(MTB,'Comandos copiados: pégalos en la línea de comandos de Minitab')},{label:'📋 Copiar cuadro actual',fn:copySquare},{label:'← Volver a datos',wide:true,fn:openData}])}
+function plantAll(){const e=plots.filter(p=>!p.crop),n=G.seedSel;if(!e.length){toast('No hay parcelas vacías');return}if((G.inv.seeds[n]||0)<e.length){toast(`Necesitas ${e.length} semillas de ${n} (tienes ${G.inv.seeds[n]||0})`);return}
+ e.forEach(p=>{p.tilled=true;soilTint(p);plantCrop(p,n)});updateStats();save();toast(`${e.length} parcelas sembradas con ${n}`);openData()}
+function openData(){const last=lastOf();
+ let tb='<table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px"><tr><th></th>'+[1,2,3,4].map(c=>`<th>Col ${c}</th>`).join('')+'</tr>';
+ for(let r=0;r<4;r++){tb+=`<tr><th>Fila ${r+1}</th>`;for(let c=0;c<4;c++){const p=plots[r*4+c],rc=last[p.id];tb+=`<td style="border:1px solid #6b866d;padding:5px"><b style="color:var(--gold);font-size:15px">${p.letter}</b><br>${rc?rc.kg+' kg':(p.crop?CROPS[p.crop].i:'·')}</td>`}tb+='</tr>'}tb+='</table>';
+ const body=`<p>Cuadro latino 4×4 nº ${G.sqn}: cada tratamiento aparece una vez por fila y por columna.</p>${tb}
+ <p style="font-size:12px"><b>Tratamientos:</b> ${TREAT.map(t=>`${t.k} = ${t.n}`).join(' · ')}.<br><b>Factores:</b> Fila (bloque), Columna (bloque), Tratamiento. <b>Factorial 2² con bloques:</b> usa Compost (0/1) y NPK (0/1) en lugar de Tratamiento (A=0/0, B=1/0, C=0/1, D=1/1). <b>Respuesta:</b> Rendimiento_kg. La columna Aplicado indica si el tratamiento sí se aplicó (1) o se olvidó (0).<br>Para un diseño válido siembra el mismo cultivo en las 16 parcelas el mismo día y aplica el tratamiento de cada una.</p>
+ <p style="font-size:12px"><b>Exportar:</b> «Copiar para Minitab (DOE)» copia el cuadro actual listo para Estadísticas ▸ DOE ▸ Factorial y te muestra la ruta paso a paso; «Copiar historial» da todas las cosechas. En Minitab pega siempre en la <b>celda gris de nombres bajo C1</b>. El CSV usa «${csvSep()}» como separador para que Excel lo abra en columnas.</p>
+ <p>Observaciones registradas: <b>${G.records.length}</b> · Decimal: <b>${G.dec==','?'coma (1,5)':'punto (1.5)'}</b></p>`;
+ openModal('📊 Datos · Cuadro latino',body,[
+  {label:'📋 Copiar para Minitab (DOE)',wide:true,fn:openMinitabDOE},{label:'📋 Copiar historial completo',fn:copyTable},
+  {label:'⬇️ CSV para Excel',fn:downloadCSV},{label:'📑 Tabla por réplicas',fn:openReplicas},
+  {label:'⬇️ TXT cuadro (Minitab)',fn:()=>{if(dl('cuadro_'+G.sqn+'_minitab.txt',squareText(MINI)))toast('TXT generado: en Minitab usa Archivo ▸ Abrir y elige el .txt (delimitado por tabulaciones)',6000)}},
+  {label:'⬇️ TXT todo (Minitab)',fn:()=>{if(needData()&&dl('historial_minitab.txt',allText(MINI)))toast('TXT generado: en Minitab usa Archivo ▸ Abrir',5000)}},
+  {label:'🧮 Comandos Minitab',fn:openCommands},{label:'🔣 Decimal: '+(G.dec==','?'coma':'punto'),fn:()=>{G.dec=G.dec==','?'.':',';save();openData()}},
+  {label:`🌱 Sembrar vacías (${G.seedSel})`,fn:plantAll},{label:'🔀 Aleatorizar nuevo cuadro',fn:()=>{if(plots.some(p=>p.crop)){toast('Cosecha o retira los cultivos antes de aleatorizar');return}G.sq=newSquare();G.rowEff=mkEff(.07);G.colEff=mkEff(.05);G.sqn++;assignLetters();toast('Nuevo cuadro latino nº '+G.sqn);openData();save()}},
+  {label:'🎲 Eventos: '+(G.eventsOn?'ACTIVOS':'APAGADOS'),fn:()=>{G.eventsOn=!G.eventsOn;toast('Eventos aleatorios '+(G.eventsOn?'activados':'apagados'));openData()}},
+  {label:'🧑‍🏫 Modo docente (+recursos)',fn:()=>{G.money+=500;G.inv.seeds[G.seedSel]=(G.inv.seeds[G.seedSel]||0)+16;G.inv.compost+=16;G.inv.npk+=16;updateStats();save();toast('+500 monedas, +16 semillas de '+G.seedSel+', +16 compost, +16 NPK')}},
+  {label:'🔭 Ver evento celeste (docente)',fn:openSkyPicker},
+  {label:'🗑️ Borrar datos',fn:()=>{if(confirm('¿Borrar las '+G.records.length+' observaciones registradas?')){G.records=[];save();openData()}}},{label:'Cerrar',fn:closeModal}])}
+// Programa un evento celeste para hoy y adelanta el reloj a media hora antes
+function openSkyPicker(){openModal('🔭 Eventos celestes',`<p>Elige un evento: se programa para hoy y el reloj salta a 30 min antes para que lo veas. Sus efectos se aplican al ocurrir.</p>`,
+ [...Object.keys(SKYEV).map(k=>{const E=SKYEV[k];return {label:`${E.i} ${E.n} (${hhmm(E.at)})`,fn:()=>{G.skyEv={k,done:false};if(k==='arcoiris')G.weather='Lluvia';G.t=Math.max(G.t,(E.at-.5)*60);applySkyDay();updateStats();closeModal();save()}}}),
+ {label:'🖼️ Usar mi imagen para el sol',fn:()=>$('sunFile').click()},
+ {label:'↩️ Sol dibujado',fn:()=>{setSunMap(drawnSun);try{localStorage.removeItem(SUNKEY)}catch(e){}toast('Se restauró el sol dibujado')}},
+ {label:'😊 Sol risueño (clima de hoy)',fn:()=>{G.weather='Sol risueño';G.skyEv=null;G.t=Math.max(G.t,600);rollSky();G.skyEv=null;applySkyDay();updateStats();closeModal();save();toast('😊 Hoy brilla el Sol risueño: cada día con este clima da +4 salud y +3 calidad')}},
+ {label:'← Volver a datos',wide:true,fn:openData}])}
+function openShop(){const b=CNAMES.map(n=>({label:`${CROPS[n].i} ${n} ×4 · ${CROPS[n].seed*4} 🪙 (tienes ${G.inv.seeds[n]||0})`,fn:()=>{const c=CROPS[n].seed*4;if(G.money<c){toast('No tienes monedas suficientes');return}G.money-=c;G.inv.seeds[n]=(G.inv.seeds[n]||0)+4;updateStats();save();openShop()}}));
+ b.push({label:`🪱 Compost ×4 · 40 🪙 (tienes ${G.inv.compost})`,fn:()=>{if(G.money<40){toast('No tienes monedas suficientes');return}G.money-=40;G.inv.compost+=4;updateStats();save();openShop()}},{label:`🧪 NPK ×4 · 60 🪙 (tienes ${G.inv.npk})`,fn:()=>{if(G.money<60){toast('No tienes monedas suficientes');return}G.money-=60;G.inv.npk+=4;updateStats();save();openShop()}},{label:'Cerrar',wide:true,fn:closeModal});
+ openModal('🏪 Tienda',`<p>Monedas: <b>${G.money}</b>. Las semillas cuestan 1 unidad por parcela.</p>`,b)}
+function openInv(){const s=CNAMES.filter(n=>G.inv.seeds[n]).map(n=>`${CROPS[n].i} ${n}: ${G.inv.seeds[n]}`).join(' · ')||'ninguna';
+ openModal('🎒 Inventario',`<p>🌱 Semillas: ${s}</p><p>🪱 Compost: ${G.inv.compost} · 🧪 NPK: ${G.inv.npk}</p><p>💧 Agua: ${G.inv.agua}/${waterCap()}</p><p>🧰 Herramientas: ${Object.keys(UPG).map(k=>`${UPG[k].i} ${upName(k)}${'★'.repeat(lv(k)-1)}`).join(' · ')}</p><p>🧺 Cosechas: ${G.inv.cosechas} · 🪙 Monedas: ${G.money}</p>`,[{label:'Cerrar',wide:true,fn:closeModal}])}
+// ---------- GUARDADO ----------
+const SAVEKEY='harvestValleySave_v3';
+function save(){try{localStorage.setItem(SAVEKEY,JSON.stringify({G,plots:plots.map(p=>({tilled:p.tilled,water:p.water,n:p.n,p:p.p,k:p.k,ph:p.ph,organic:p.organic,crop:p.crop,stage:p.stage,health:p.health,days:p.days,applied:p.applied,wsum:p.wsum,bonus:p.bonus,qb:p.qb}))}))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(SAVEKEY));if(!d)return false;Object.assign(G,d.G);G.records.forEach(r=>{const t=TREAT['ABCD'.indexOf(r.trat)];if(t&&r.compost===undefined){r.compost=t.compost;r.npk=t.npk;r.aplic=''}});d.plots.forEach((v,i)=>{Object.assign(plots[i],v)});return true}catch(e){return false}}
+// ---------- CONTROLES ----------
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+function setTool(t){tool=t;document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('active',x.dataset.tool===t));msg('Herramienta equipada: '+toolName())}
+const ray=new T.Raycaster(),center=new T.Vector2(0,0),meshes=plots.map(p=>p.mesh);
+function hitPlot(max){camera.updateMatrixWorld();ray.setFromCamera(center,camera);const h=ray.intersectObjects(meshes);return h.length&&h[0].distance<=max?plots.find(p=>p.mesh===h[0].object):null}
+function interact(){if(nearAlien()){openOxxo();return}const p=hitPlot(5.5);if(p){selected=p;selBox.position.set(p.x,.15,p.z);selBox.visible=true;useTool(p)}else if(pondHit(6)||nearPond())refill();else toast('Acércate y apunta a una parcela')}
+// Salto: velocidad inicial según los tenis; el techo de la tienda limita la altura
+let jy=0,vy=0;
+function jump(){if(jy===0&&!modalOpen())vy=[0,4.2,5,5.8][lv('boots')]}
+$('use').onclick=interact;$('jumpB').addEventListener('pointerdown',e=>{e.preventDefault();jump()});$('sleep').onclick=()=>nextDay();$('inventory').onclick=openInv;$('shop').onclick=openShop;$('data').onclick=openData;
+const cv=renderer.domElement,locked=()=>document.pointerLockElement===cv;let drag=null,lockFail=false;
+document.addEventListener('pointerlockerror',()=>{lockFail=true;msg('No se pudo capturar el ratón: arrastra con el botón izquierdo para mirar.')});
+document.addEventListener('pointerlockchange',()=>msg(locked()?'Ratón capturado (Esc para soltar).':'Haz clic en la pantalla para controlar la cámara.'));
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false,type:e.pointerType};try{cv.setPointerCapture(e.pointerId)}catch(_){}});
+cv.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id||locked())return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;
+ if(drag.moved){const k=drag.type==='touch'?1:.8;yaw-=dx*.006*k;pitch=clamp(pitch-dy*.005*k,-1.2,.9)}drag.x=e.clientX;drag.y=e.clientY});
+cv.addEventListener('pointerup',e=>{if(!drag||e.pointerId!==drag.id)return;const d=drag;drag=null;if(d.moved)return;
+ if(d.type==='mouse'&&!locked()&&!lockFail&&innerWidth>700){cv.requestPointerLock&&cv.requestPointerLock();return}
+ const p=hitPlot(8);if(p)selectPlot(p);else if(pondHit(8))refill()});
+cv.addEventListener('pointercancel',()=>drag=null);
+document.addEventListener('mousemove',e=>{if(!locked())return;const mx=e.movementX,my=e.movementY;if(Math.abs(mx)>250||Math.abs(my)>250)return;yaw-=mx*.0022;pitch=clamp(pitch-my*.0022,-1.2,.9)});
+document.addEventListener('keydown',e=>{if(e.code==='Escape'&&modalOpen()){closeModal();return}if(modalOpen())return;keys[e.code]=true;
+ if(e.code==='Space'){e.preventDefault();const a=document.activeElement;if(a&&a!==document.body&&a.blur)a.blur();jump();return}
+ if(e.code==='KeyE')interact();else if(e.code==='KeyT')nextDay();else if(e.code==='KeyI')openInv();
+ else if(/^Digit[1-5]$/.test(e.code))setTool(['hoe','seed','water','fert','harvest'][+e.code[5]-1]);
+ if(e.code.startsWith('Arrow'))e.preventDefault()});
+document.addEventListener('keyup',e=>keys[e.code]=false);addEventListener('blur',()=>{for(const k in keys)keys[k]=false;for(const k in move)move[k]=false});
+document.querySelectorAll('[data-move]').forEach(b=>{const k=b.dataset.move,dn=e=>{e.preventDefault();move[k]=true},up=e=>{e.preventDefault();move[k]=false};b.addEventListener('pointerdown',dn);b.addEventListener('pointerup',up);b.addEventListener('pointerleave',up);b.addEventListener('pointercancel',up)});
+$('turnL').onclick=()=>yaw+=.22;$('turnR').onclick=()=>yaw-=.22;
+const blocked=(x,z)=>STORE_RECTS.some(r=>x>r[0]-.28&&x<r[1]+.28&&z>r[2]-.28&&z<r[3]+.28)||((x-POND.x)/(POND.rx+.3))**2+((z-POND.z)/(POND.rz+.3))**2<1||treeSpots.some(t=>(x-t[0])**2+(z-t[1])**2<.64);
+// ---------- BUCLE ----------
+let last=performance.now(),bob=0,uiT=0,shT=0,lastPond='';
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;
+ if(!modalOpen()){
+  yaw+=((keys.ArrowLeft?1:0)-(keys.ArrowRight?1:0))*1.8*dt;pitch=clamp(pitch+((keys.ArrowUp?1:0)-(keys.ArrowDown?1:0))*1.2*dt,-1.2,.9);
+  const f=(keys.KeyW||move.forward?1:0)-(keys.KeyS||move.back?1:0),s=(keys.KeyD||move.right?1:0)-(keys.KeyA||move.left?1:0);
+  if(f||s){const sp=4.2*[0,1,1.25,1.5][lv('boots')]*(keys.ShiftLeft||keys.ShiftRight?1.8:1)*dt/Math.hypot(f,s),sn=Math.sin(yaw),cs=Math.cos(yaw);
+   const dx=(-sn*f+cs*s)*sp,dz=(-cs*f-sn*s)*sp;let x=camera.position.x,z=camera.position.z;
+   if(!blocked(x+dx,z))x=clamp(x+dx,-9.4,9.4);if(!blocked(x,z+dz))z=clamp(z+dz,-9.4,9.4);camera.position.x=x;camera.position.z=z;bob+=dt*9}
+  if(vy||jy>0){vy-=14*dt;jy+=vy*dt;const top=inStore()?1.05:9;if(jy>top){jy=top;vy=Math.min(vy,0)}if(jy<=0){jy=0;vy=0}}
+  camera.position.y=1.62+jy+((f||s)&&!jy?Math.sin(bob)*.03:0);
+  G.t+=dt*3;if(G.t>=1560)nextDay(true)}
+ camera.rotation.set(pitch,yaw,0);
+ if(G.skyEv&&!G.skyEv.done&&G.t/60>=SKYEV[G.skyEv.k].at){toast(fireSky(),6000);updateStats();save()}
+ updateSky(dt);updateRain(dt);clouds.forEach(c=>{c.position.x+=dt*.8;if(c.position.x>90)c.position.x=-90});
+ const hp=hitPlot(5.5);hoverBox.visible=!!hp&&!modalOpen();if(hp)hoverBox.position.set(hp.x,.15,hp.z);
+ const spot=nearAlien()?'alien':!hp&&(nearPond()||pondHit(6))?'pond':'';
+ if(spot!==lastPond){lastPond=spot;msg(spot==='alien'?'👽 Cajero del OXXO: pulsa E para comprar herramientas':spot==='pond'?'💧 Estanque: pulsa E (o clic) para rellenar la regadera':'Herramienta equipada: '+toolName())}
+ const ins=inStore();if(ins&&!greeted){greeted=true;alienExcite=2;toast('👽 «¡Bienvenido al OXXO, terrícola! Acércate al mostrador.»',3500)}else if(!ins)greeted=false;
+ updateDoors(dt);updateAlien(dt,now/1000);
+ waterTex.offset.x+=dt*.02;waterTex.offset.y+=dt*.008;
+ const pulse=1+Math.sin(now*.006)*.08;for(const p of plots){const s=p.meter.s;if(s.visible&&p.stage>=3)s.scale.set(.32*pulse,1.05*pulse,1)}
+ uiT+=dt;if(uiT>.5){uiT=0;if(!modalOpen())$('clock').textContent=clockText()}
+ // El sol avanza ~0.75°/s: basta con recalcular sombras 5 veces por segundo
+ shT+=dt;if(shT>.2){shT=0;renderer.shadowMap.needsUpdate=true}
+ renderer.render(scene,camera)}
+const loaded=load();applySkyDay();assignLetters();plots.forEach(p=>{plantModel(p);soilTint(p)});updateTools();updateStats();setTool('hoe');if(loaded)toast('Partida recuperada');
+document.fonts&&document.fonts.ready.then(()=>plots.forEach(p=>{p.meter.key='';drawMeter(p)}));// redibuja medidores con la fuente pixel
+requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+})();
+</script>
+</body></html>
